@@ -1,4 +1,6 @@
-# NFSBlacklist
+<p align="center">
+  <img src="assets/images/icon.png" width="128" alt="NFSBlacklist">
+</p>
 
 Automated setup for classic Black Box Need for Speed games on Steam Deck and Linux handhelds.
 
