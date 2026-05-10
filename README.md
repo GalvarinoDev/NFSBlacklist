@@ -4,7 +4,7 @@
 
 Automated setup for classic Black Box Need for Speed games on Steam Deck and Linux handhelds.
 
-NFSBlacklist detects your game files, installs community fixes, creates Proton prefixes, and adds non-Steam shortcuts with controller profiles — so you can boot into Game Mode and just play.
+NFSBlacklist detects your game files, installs community fixes, creates Proton prefixes, and adds non-Steam shortcuts with controller profiles so you can boot into Game Mode and just play.
 
 ## Supported Games
 
@@ -26,16 +26,16 @@ NFSBlacklist detects your game files, installs community fixes, creates Proton p
 
 **You provide the game files.** These titles were never sold on digital stores. NFSBlacklist does not download games — it sets them up for you once you have them.
 
-- Detects and validates your game installs
-- Downloads GE-Proton and creates prefixes
-- Installs community widescreen and compatibility fixes
-- Writes display configs tuned to your device
-- Creates non-Steam shortcuts with artwork
-- Assigns controller profiles with a racing-optimized layout
+- Scans your device for game installs automatically whether it's your SD card, internal storage, wherever they are
+- Downloads the latest GE-Proton and creates a Proton prefix for each game, no manual setup required
+- Installs ThirteenAG's Widescreen Fix, Extra Options, XtendedInput, and XenonEffects for each game.
+- Patches mod configs for your device out of the box: correct aspect ratio, controller input handled, intro videos skipped.
+- Creates non-Steam shortcuts with full artwork pulled from SteamGridDB so your library looks right in Game Mode.
+- Sets GE-Proton as the compatibility tool for each shortcut automatically.
 
 ## Project Status
 
-Early development. Currently not playtest worthy.
+Early development. Not currently playable.
 
 ---
 
