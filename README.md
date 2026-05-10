@@ -24,7 +24,7 @@ NFSBlacklist detects your game files, installs community fixes, creates Proton p
 
 ## What It Does
 
-**You provide the game files.** These titles were never sold on digital stores. NFSBlacklist does not download games — it sets them up for you once you have them.
+**You provide the game files.** These titles were never sold on digital stores. NFSBlacklist does not download games, it sets them up for you once you have them.
 
 - Scans your device for game installs automatically whether it's your SD card, internal storage, wherever they are
 - Downloads the latest GE-Proton and creates a Proton prefix for each game, no manual setup required
