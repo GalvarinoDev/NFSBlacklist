@@ -22,7 +22,7 @@ NFSBlacklist detects your game files, installs community fixes, creates Proton p
 
 ## What It Does
 
-**You provide the game files.** These titles were delisted from digital stores years ago. NFSBlacklist does not download games — it sets them up for you once you have them.
+**You provide the game files.** These titles were never sold on digital stores. NFSBlacklist does not download games — it sets them up for you once you have them.
 
 - Detects and validates your game installs
 - Downloads GE-Proton and creates prefixes
@@ -35,6 +35,18 @@ NFSBlacklist detects your game files, installs community fixes, creates Proton p
 
 Early development. Currently not playtest worthy.
 
+---
+
+## Credits
+
+Steam artwork from [SteamGridDB](https://www.steamgriddb.com) - thanks to [atmur](https://www.steamgriddb.com/profile/76561198100942529), [Bcoder](https://www.steamgriddb.com/profile/76561198042209011), [DustinEden](https://www.steamgriddb.com/profile/76561198053432620), [EthanBB](https://www.steamgriddb.com/profile/76561198032970704), [FrostWolf](https://www.steamgriddb.com/profile/76561198319892674), [Haxy](https://www.steamgriddb.com/profile/76561198205566017), [iixCarbonxZz](https://www.steamgriddb.com/profile/76561198074871945), [Luqgreg](https://www.steamgriddb.com/profile/76561198211811416), [mdante_ar](https://www.steamgriddb.com/profile/76561198148269891), [r_dsgnd](https://www.steamgriddb.com/profile/76561198355292092), [yst](https://www.steamgriddb.com/profile/76561198095634087), and [☆](https://www.steamgriddb.com/profile/76561198963120555).
+
+**[Claude](https://claude.ai)** by Anthropic - assisted in development.
+
+---
+
+> NFSBlacklist is not affiliated with Electronic Arts, EA Black Box, or Valve. All trademarks belong to their respective owners. NFSBlacklist does not provide or distribute game files.
+
 ## License
 
-MIT
+[MIT License](LICENSE)

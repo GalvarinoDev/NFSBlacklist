@@ -1,0 +1,36 @@
+.
+├── assets
+│   └── images
+│       ├── icon.png
+│       └── setup.png
+├── install.sh
+├── launcher.sh
+├── LICENSE
+├── NFSBlacklist.desktop
+├── nfsblacklist_identity.sh
+├── nfsblacklist_uninstall.sh
+├── README.md
+├── requirements.txt
+├── src
+│   ├── bootstrap.py
+│   ├── config.py
+│   ├── detect_games.py
+│   ├── extra_options.py
+│   ├── ge_proton.py
+│   ├── identity.py
+│   ├── ini_utils.py
+│   ├── log.py
+│   ├── main.py
+│   ├── net.py
+│   ├── shortcut.py
+│   ├── ui_constants.py
+│   ├── ui_install.py
+│   ├── ui_qt.py
+│   ├── ui_setup.py
+│   ├── widescreen_fix.py
+│   ├── wrapper.py
+│   ├── xenon_effects.py
+│   └── xtended_input.py
+└── tree.txt
+
+4 directories, 30 files
