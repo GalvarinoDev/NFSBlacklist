@@ -900,7 +900,7 @@ def enrich_own_games(own_games: dict, selected_keys: list,
         # No mod clients redirect the exe (unlike CoD Plutonium/IW4x).
         # STEAM_COMPAT_DATA_PATH tells Proton which prefix to use.
         actual_exe     = exe_path
-        launch_options = f'STEAM_COMPAT_DATA_PATH="{compatdata_path}" %command%'
+        launch_options = f'STEAM_COMPAT_DATA_PATH="{compatdata_path}" WINEDLLOVERRIDES="dinput8=n,b" %command%'
 
         # Store resolved values for write_own_shortcuts() to use later
         game["_own_actual_exe"]     = actual_exe
