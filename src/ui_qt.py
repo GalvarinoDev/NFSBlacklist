@@ -29,9 +29,7 @@ from ui_constants import (
 
 from ui_setup import SetupFlowScreen
 from ui_install import OwnScanScreen, OwnInstallScreen
-
-# Uncomment as modules are built
-# from ui_manage import ManagementScreen, ConfigureScreen, SetupCompleteScreen, UpdateScreen
+from ui_manage import ManagementScreen, ConfigureScreen, SetupCompleteScreen, UpdateScreen
 
 
 # -- BootstrapScreen -----------------------------------------------------------
@@ -76,11 +74,7 @@ class BootstrapScreen(QWidget):
         if cfg.is_first_run():
             go_to(self.stack, "SetupFlowScreen")
         else:
-            # ManagementScreen not built yet - show placeholder
-            screen = go_to(self.stack, "ManagementScreen")
-            if screen is None:
-                self.status.setText("Setup complete. (ManagementScreen not built yet)")
-                self.bar.setValue(100)
+            go_to(self.stack, "ManagementScreen")
 
 
 # -- NFSBlacklistWindow --------------------------------------------------------
@@ -99,11 +93,10 @@ class NFSBlacklistWindow(QMainWindow):
             SetupFlowScreen,
             OwnScanScreen,
             OwnInstallScreen,
-            # Uncomment as modules are built
-            # ManagementScreen,
-            # ConfigureScreen,
-            # SetupCompleteScreen,
-            # UpdateScreen,
+            ManagementScreen,
+            ConfigureScreen,
+            SetupCompleteScreen,
+            UpdateScreen,
         ]:
             self.stack.addWidget(cls(self.stack))
 
