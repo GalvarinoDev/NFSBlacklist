@@ -9,7 +9,7 @@ Unlike DeckOps, there are no Steam CDN downloads here. These games were
 never on Steam so there are no store portrait images to fetch. Grid art
 for non-Steam shortcuts is bundled with the repo in assets/images/headers/.
 
-Russo One font is bundled at assets/fonts/RussoOne-Regular.ttf.
+Orbitron variable font is bundled at assets/fonts/Orbitron-VariableFont_wght.ttf.
 
 Music is NOT downloaded here. If assets/music/background.mp3 is present
 it will be played automatically.
@@ -29,9 +29,9 @@ os.makedirs(HEADERS_DIR, exist_ok=True)
 os.makedirs(MUSIC_DIR,   exist_ok=True)
 
 # -- Font ----------------------------------------------------------------------
-# Russo One is shipped with the repo in assets/fonts/ - no download needed.
+# Orbitron is shipped with the repo in assets/fonts/ - no download needed.
 
-FONT_FILE = "RussoOne-Regular.ttf"
+FONT_FILE = "Orbitron-VariableFont_wght.ttf"
 
 # -- Grid images ---------------------------------------------------------------
 # Grid art for non-Steam shortcuts is bundled in assets/images/headers/.
@@ -82,7 +82,7 @@ def run(on_progress=None, on_complete=None):
 
 
 def fonts_ready() -> bool:
-    """Returns True if the bundled Russo One font file is present on disk."""
+    """Returns True if the bundled Orbitron font file is present on disk."""
     return os.path.exists(os.path.join(FONTS_DIR, FONT_FILE))
 
 

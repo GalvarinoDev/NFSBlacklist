@@ -46,16 +46,17 @@ def _log_to_file(text: str):
 
 
 # -- Colors --------------------------------------------------------------------
-# TODO: Pick NFS-themed colors later. Using DeckOps palette as placeholder.
+# M3 GTR palette: deep navy, BMW racing blue, silver chrome, white.
+# No orange. Cold racing aesthetic throughout.
 
-C_BG       = "#141416"
-C_CARD     = "#1E1E26"
-C_ACCENT1  = "#6DC62B"      # green accent (was C_IW)
-C_ACCENT2  = "#F47B20"      # orange accent (was C_TREY)
-C_DIM      = "#888899"
-C_DARK_BTN = "#33333F"
-C_RED_BTN  = "#7A1515"
-C_BLUE_BTN = "#1A5FAA"
+C_BG       = "#0a0e17"      # deep navy - app background
+C_CARD     = "#141c2b"      # navy surface - cards, panels
+C_ACCENT1  = "#3b7dd8"      # BMW racing blue - primary actions
+C_ACCENT2  = "#c0c8d4"      # silver chrome - progress bars, highlights
+C_DIM      = "#7a8599"      # blue-grey - muted text
+C_DARK_BTN = "#1e2a3d"      # dark navy - inactive buttons
+C_RED_BTN  = "#7A1515"      # red - uninstall, destructive
+C_BLUE_BTN = "#3b7dd8"      # same as accent1 - unified blue
 
 
 # -- Fonts ---------------------------------------------------------------------
@@ -68,13 +69,13 @@ def _load_font():
     global _FONT_FAMILY, _FONT_FAMILY_DISP, _FONT_LOADED
     if _FONT_LOADED:
         return
-    russo = os.path.join(FONTS_DIR, "RussoOne-Regular.ttf")
-    if not os.path.exists(russo):
+    orbitron = os.path.join(FONTS_DIR, "Orbitron-VariableFont_wght.ttf")
+    if not os.path.exists(orbitron):
         raise FileNotFoundError(
-            f"Required font not found: {russo}\n"
-            f"Ensure assets/fonts/RussoOne-Regular.ttf is present in the repo."
+            f"Required font not found: {orbitron}\n"
+            f"Ensure assets/fonts/Orbitron-VariableFont_wght.ttf is present in the repo."
         )
-    fid = QFontDatabase.addApplicationFont(russo)
+    fid = QFontDatabase.addApplicationFont(orbitron)
     fams = QFontDatabase.applicationFontFamilies(fid)
     if fams:
         _FONT_FAMILY      = fams[0]
@@ -255,9 +256,9 @@ def _title_block(lay, main_size=56):
     sub = QLabel()
     sub.setTextFormat(Qt.RichText)
     sub.setAlignment(Qt.AlignCenter)
-    sub.setStyleSheet(f"color:{C_ACCENT2}; background:transparent;")
+    sub.setStyleSheet(f"color:{C_ACCENT1}; background:transparent;")
     sub.setText(
-        f'<span style="font-family:\'{_FONT_FAMILY_DISP}\'; font-size:28pt; color:{C_ACCENT2};">'
+        f'<span style="font-family:\'{_FONT_FAMILY_DISP}\'; font-size:28pt; color:{C_ACCENT1};">'
         f'BLACK BOX '
         f'<span style="font-size:16pt;">on</span> '
         f'DECK'
@@ -270,7 +271,7 @@ def _title_block(lay, main_size=56):
         badge.setFont(font(10, bold=True))
         badge.setAlignment(Qt.AlignCenter)
         badge.setStyleSheet(
-            "color:#F47B20;background:#2A1A08;border:1px solid #F47B20;"
+            f"color:{C_ACCENT1};background:#0d1a2e;border:1px solid {C_ACCENT1};"
             "border-radius:4px;padding:2px 10px;"
         )
         bw = QHBoxLayout(); bw.addStretch(); bw.addWidget(badge); bw.addStretch()
@@ -296,12 +297,12 @@ def _app_style():
 * {{ font-family: "{_FONT_FAMILY}"; }}
 QWidget {{ background-color:{C_BG}; color:#FFF; }}
 QScrollArea, QScrollArea > QWidget > QWidget {{ background:{C_BG}; border:none; }}
-QScrollBar:vertical {{ background:#1E1E28; width:8px; border-radius:4px; }}
-QScrollBar::handle:vertical {{ background:#44445A; border-radius:4px; min-height:30px; }}
+QScrollBar:vertical {{ background:#0d1520; width:8px; border-radius:4px; }}
+QScrollBar::handle:vertical {{ background:#2a3a52; border-radius:4px; min-height:30px; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height:0; }}
-QProgressBar {{ background:#252535; border-radius:7px; border:none; }}
+QProgressBar {{ background:#111927; border-radius:7px; border:none; }}
 QProgressBar::chunk {{ background:{C_ACCENT2}; border-radius:7px; }}
-QCheckBox::indicator {{ width:22px; height:22px; border:2px solid #555568; border-radius:4px; background:#252535; }}
+QCheckBox::indicator {{ width:22px; height:22px; border:2px solid #2a3a52; border-radius:4px; background:#111927; }}
 QCheckBox::indicator:checked {{ background:{C_ACCENT1}; border-color:{C_ACCENT1}; }}
 """
 
