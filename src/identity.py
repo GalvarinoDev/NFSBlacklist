@@ -18,7 +18,7 @@ import os
 
 # -- The one value you change per branch --------------------------------------
 
-BRANCH = "nightly"  # "nightly" or "stable"
+BRANCH = "stable"  # "nightly" or "stable"
 
 # -- Everything below is derived ----------------------------------------------
 
