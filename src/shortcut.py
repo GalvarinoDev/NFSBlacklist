@@ -231,13 +231,13 @@ def _read_shortcuts_raw(path: str) -> bytes:
         _log.debug("shortcuts.vdf read failed", exc_info=True)
         return b''
 
-    # Strip header (b'\x00shortcuts\x00') and footer (b'\x08\x08')
+    # Strip header (b'\x00shortcuts\x00') and the root block terminator (single \x08).
+    # Each entry already carries its own \x08 close byte — only the final
+    # \x08 that closes the 'shortcuts' root block needs stripping.
     header = b'\x00shortcuts\x00'
     if data.startswith(header):
         data = data[len(header):]
-    if data.endswith(b'\x08\x08'):
-        data = data[:-2]
-    elif data.endswith(b'\x08'):
+    if data.endswith(b'\x08'):
         data = data[:-1]
 
     return data
@@ -301,7 +301,7 @@ def _write_shortcuts_vdf(path: str, existing_raw: bytes, new_entries: list):
     for entry_bytes in new_entries:
         data += entry_bytes
 
-    data += b'\x08\x08'
+    data += b'\x08'
 
     with open(path, 'wb') as f:
         f.write(data)
@@ -784,14 +784,12 @@ def remove_shortcut(name: str, exe_path: str, artwork_def: dict = None,
             continue
 
         header = b'\x00shortcuts\x00'
-        footer = b'\x08\x08'
+        footer = b'\x08'
 
         body = data
         if body.startswith(header):
             body = body[len(header):]
-        if body.endswith(footer):
-            body = body[:-2]
-        elif body.endswith(b'\x08'):
+        if body.endswith(b'\x08'):
             body = body[:-1]
 
         entry_starts = []
