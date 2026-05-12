@@ -46,13 +46,14 @@ echo ""
 # ── Close Steam ──────────────────────────────────────────────────────────────
 info "Closing Steam..."
 
-if pgrep -x "steam" > /dev/null 2>&1 || pgrep -f "steam.sh" > /dev/null 2>&1; then
-    steam -shutdown 2>/dev/null
+if pgrep -x "steam" > /dev/null 2>&1 || pgrep -f "steamwebhelper" > /dev/null 2>&1; then
+    # Force kill Steam and all webhelper processes
+    killall -9 steam steamwebhelper 2>/dev/null
 
-    deadline=$((SECONDS + 120))
-    while pgrep -x "steam" > /dev/null 2>&1 || pgrep -f "steam.sh" > /dev/null 2>&1; do
+    deadline=$((SECONDS + 30))
+    while pgrep -x "steam" > /dev/null 2>&1 || pgrep -f "steamwebhelper" > /dev/null 2>&1; do
         if [ $SECONDS -ge $deadline ]; then
-            warn "Steam did not close within 120 seconds."
+            warn "Steam did not close within 30 seconds."
             warn "Please close Steam manually and re-run the uninstaller."
             exit 1
         fi
@@ -96,7 +97,7 @@ echo ""
 if [ -n "$STEAM_ROOT" ] && [ -d "$STEAM_ROOT/userdata" ]; then
     info "Removing NFSBlacklist shortcuts and artwork..."
 python3 - "$STEAM_ROOT" <<'PYEOF'
-import os, re, sys, struct
+import os, sys, struct
 
 steam_root = sys.argv[1]
 userdata   = os.path.join(steam_root, "userdata")
@@ -104,8 +105,100 @@ userdata   = os.path.join(steam_root, "userdata")
 if not os.path.isdir(userdata):
     sys.exit(0)
 
+HEADER = b'\x00shortcuts\x00'
 removed_total = 0
 appids_removed = set()
+
+def parse_entries(data):
+    """Parse binary VDF shortcut entries by tracking nesting depth."""
+    if not data.startswith(HEADER):
+        return None
+    entries = []
+    pos = len(HEADER)
+    while pos < len(data):
+        # Entry starts with \x00
+        if data[pos] != 0x00:
+            break
+        entry_start = pos
+        # Skip past index: \x00<digits>\x00
+        pos += 1
+        while pos < len(data) and data[pos] != 0x00:
+            pos += 1
+        if pos >= len(data):
+            break
+        pos += 1  # skip the null after index
+        # Now scan fields, tracking nesting for tags sub-block
+        depth = 0
+        while pos < len(data):
+            byte = data[pos]
+            if byte == 0x08:  # end marker
+                if depth == 0:
+                    pos += 1
+                    entries.append(data[entry_start:pos])
+                    break
+                else:
+                    depth -= 1
+                    pos += 1
+            elif byte == 0x00:
+                # Sub-section start (e.g. tags)
+                depth += 1
+                pos += 1
+                # skip name
+                while pos < len(data) and data[pos] != 0x00:
+                    pos += 1
+                pos += 1  # skip null
+            elif byte == 0x01:
+                # String field: \x01<key>\x00<value>\x00
+                pos += 1
+                while pos < len(data) and data[pos] != 0x00:
+                    pos += 1
+                pos += 1  # skip null after key
+                while pos < len(data) and data[pos] != 0x00:
+                    pos += 1
+                pos += 1  # skip null after value
+            elif byte == 0x02:
+                # Int32 field: \x02<key>\x00<4 bytes>
+                pos += 1
+                while pos < len(data) and data[pos] != 0x00:
+                    pos += 1
+                pos += 1  # skip null after key
+                pos += 4  # skip 4-byte value
+            else:
+                pos += 1
+    return entries
+
+def get_appname(entry):
+    marker = b'\x01AppName\x00'
+    idx = entry.find(marker)
+    if idx < 0:
+        return None
+    start = idx + len(marker)
+    end = entry.find(b'\x00', start)
+    if end < 0:
+        return None
+    return entry[start:end].decode('utf-8', errors='replace')
+
+def get_appid(entry):
+    marker = b'\x02appid\x00'
+    idx = entry.find(marker)
+    if idx < 0:
+        return None
+    offset = idx + len(marker)
+    if offset + 4 > len(entry):
+        return None
+    signed = struct.unpack_from('<i', entry, offset)[0]
+    return signed if signed >= 0 else signed + 2**32
+
+def rebuild_vdf(kept_entries):
+    output = HEADER
+    for i, entry in enumerate(kept_entries):
+        # Replace the old index with the new sequential index
+        # Entry format: \x00<old_index>\x00<rest...>
+        inner_null = entry.find(b'\x00', 1)
+        rest = entry[inner_null:]
+        output += b'\x00' + str(i).encode('utf-8') + rest
+    output += b'\x08'
+    return output
 
 for uid in os.listdir(userdata):
     if not uid.isdigit() or int(uid) < 10000:
@@ -119,39 +212,19 @@ for uid in os.listdir(userdata):
     except Exception:
         continue
 
-    if not data.startswith(b'\x00shortcuts\x00'):
+    entries = parse_entries(data)
+    if entries is None:
         continue
-
-    header = b'\x00shortcuts\x00'
-    body = data[len(header):]
-
-    # Split into entries by finding entry start markers
-    entry_starts = []
-    for m in re.finditer(rb'\x00\d+\x00', body):
-        entry_starts.append(m.start())
-
-    if not entry_starts:
-        continue
-
-    entries = []
-    for i, start in enumerate(entry_starts):
-        end = entry_starts[i + 1] if i + 1 < len(entry_starts) else len(body)
-        entries.append(body[start:end])
 
     kept = []
     removed_here = 0
     for entry in entries:
-        # Check for NFSBlacklist tag
         if b'NFSBlacklist' in entry:
-            # Extract appid for artwork cleanup
-            marker = b'\x02appid\x00'
-            marker_pos = entry.find(marker)
-            if marker_pos != -1:
-                appid_offset = marker_pos + len(marker)
-                if appid_offset + 4 <= len(entry):
-                    signed = struct.unpack_from("<i", entry, appid_offset)[0]
-                    unsigned = signed if signed >= 0 else signed + 2**32
-                    appids_removed.add(str(unsigned))
+            appid = get_appid(entry)
+            if appid is not None:
+                appids_removed.add(str(appid))
+            name = get_appname(entry) or "(unknown)"
+            print(f"  Removing: {name}")
             removed_here += 1
             continue
         kept.append(entry)
@@ -159,14 +232,7 @@ for uid in os.listdir(userdata):
     if removed_here == 0:
         continue
 
-    # Re-index remaining entries
-    reindexed = []
-    for new_idx, entry in enumerate(kept):
-        entry = re.sub(rb'^\x00\d+\x00', f'\x00{new_idx}\x00'.encode(), entry)
-        reindexed.append(entry)
-
-    new_body = b''.join(reindexed)
-    new_data = header + new_body + b'\x08\x08'
+    new_data = rebuild_vdf(kept)
 
     # Backup before writing
     bak = vdf + ".nfsbl_uninstall.bak"
@@ -184,13 +250,13 @@ for uid in os.listdir(userdata):
     if os.path.isdir(grid_dir):
         art_removed = 0
         for appid_str in appids_removed:
-            import glob
-            for f in glob.glob(os.path.join(grid_dir, f"{appid_str}*")):
-                try:
-                    os.remove(f)
-                    art_removed += 1
-                except OSError:
-                    pass
+            for f in os.listdir(grid_dir):
+                if f.startswith(appid_str):
+                    try:
+                        os.remove(os.path.join(grid_dir, f))
+                        art_removed += 1
+                    except OSError:
+                        pass
         if art_removed > 0:
             print(f"  uid {uid}: removed {art_removed} artwork file(s)")
 
@@ -436,20 +502,11 @@ echo "  All NFSBlacklist mod files removed from game directories."
 echo "  All NFSBlacklist shortcuts and artwork removed."
 echo "  All Proton prefixes created by NFSBlacklist removed."
 echo ""
-
-info "Uninstall complete — restarting Steam..."
+echo "  Start Steam manually when ready."
 echo ""
 
-gtk-launch steam.desktop
-
-zenity --info \
-    --title="$APP_TITLE Uninstaller" \
-    --text="NFSBlacklist fully uninstalled.\n\nYour game files are untouched.\nAll mod files removed from game directories.\nAll shortcuts and artwork removed.\nAll Proton prefixes removed.\n\nSteam is restarting." \
-    --timeout=12 \
-    2>/dev/null &
-
-for i in 10 9 8 7 6 5 4 3 2 1; do
-    printf "\r  Closing in %d seconds... " "$i"
+for i in 5 4 3 2 1; do
+    printf "\r  Closing in %d... " "$i"
     sleep 1
 done
 echo ""
