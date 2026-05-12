@@ -1,18 +1,22 @@
 """
 shortcut.py - NFSBlacklist non-Steam shortcut creator
 
-Creates non-Steam game shortcuts in Steam for the 4 Black Box NFS titles.
-These games are own-game-only (never sold on digital stores), so every
-shortcut points to the user's own game exe with a Proton prefix.
+Creates non-Steam game shortcuts in Steam for the four Black Box NFS titles.
+These games were never sold on Steam, so every shortcut is an own-game
+non-Steam entry pointing at the game exe inside a GE-Proton prefix.
 
 Shortcuts include:
   - Proper artwork (icon, grid, wide, hero, logo) from SteamGridDB
-  - Correct compatdata prefix via launch options
-  - Controller template assignment based on gyro mode
+  - Correct compatdata prefix via STEAM_COMPAT_DATA_PATH
+  - WINEDLLOVERRIDES="dinput8=n,b" for ASI loader (all mods need this)
   - GE-Proton compat tool assignment
   - Steam Input enabled (AllowDesktopConfig)
+  - Controller template assignment (stubbed - Phase 4)
 
-Called at the end of OwnInstallScreen._run() after mod installation completes.
+Called from ui_install.py in two phases:
+  1. enrich_own_games()    -- early, before prefix creation
+  2. write_own_shortcuts() -- after mod installs are complete
+
 Must be called while Steam is closed.
 """
 
@@ -31,7 +35,7 @@ from log import get_logger
 _log = get_logger(__name__)
 
 
-# -- Paths ---------------------------------------------------------------------
+# -- Paths --------------------------------------------------------------------
 
 STEAM_ROOT     = os.path.expanduser("~/.local/share/Steam")
 USERDATA_DIR   = os.path.join(STEAM_ROOT, "userdata")
@@ -40,6 +44,9 @@ STEAM_CONFIG   = os.path.join(STEAM_ROOT, "config", "config.vdf")
 
 _HERE          = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT   = os.path.dirname(_HERE)
+
+# Controller templates directory - not populated yet (Phase 4).
+# When racing VDFs land they go here.
 ASSETS_DIR     = os.path.join(PROJECT_ROOT, "assets", "controllers")
 
 MIN_UID = 10000
@@ -52,12 +59,14 @@ _BROWSER_UA = {
 }
 
 
-# -- NFS shortcut definitions -------------------------------------------------
+# -- NFS shortcut definitions ------------------------------------------------
+# One entry per supported game. All four are own-game non-Steam shortcuts.
 #
-# All 4 NFS games are own-game-only. Each entry defines the canonical shortcut
-# name (which determines the appid CRC), artwork URLs, and controller type.
+# template_type is reserved for Phase 4 controller templates. All NFS games
+# share a single "racing" profile type (unlike DeckOps which has
+# "standard" vs "other" for CoD).
 #
-# Artwork credits (SteamGridDB): see README.md
+# Artwork credits: SteamGridDB community artists (see README.md)
 
 NFS_SHORTCUTS = {
     "nfsu": {
@@ -68,7 +77,8 @@ NFS_SHORTCUTS = {
         "wide_url":       "https://cdn2.steamgriddb.com/grid/4ea29595c25ccf7a33d3fdec75630d5a.png",
         "hero_url":       "https://cdn2.steamgriddb.com/hero/ccc81a97c1535f9a631b9db584a264e4.png",
         "logo_url":       "https://cdn2.steamgriddb.com/logo/750263dbb2fb8547bdd810ee11a08c7a.png",
-        "icon_ext": "ico", "grid_ext": "png", "wide_ext": "png", "hero_ext": "png", "logo_ext": "png",
+        "icon_ext": "ico", "grid_ext": "png", "wide_ext": "png",
+        "hero_ext": "png", "logo_ext": "png",
     },
     "nfsu2": {
         "name":           "Need for Speed: Underground 2",
@@ -78,7 +88,8 @@ NFS_SHORTCUTS = {
         "wide_url":       "https://cdn2.steamgriddb.com/grid/c0c783b5fc0d7d808f1d14a6e9c8280d.png",
         "hero_url":       "https://cdn2.steamgriddb.com/hero/8c2d7d2728733cad5681b6b79ae799e4.png",
         "logo_url":       "https://cdn2.steamgriddb.com/logo/7a614fd06c325499f1680b9896beedeb.png",
-        "icon_ext": "ico", "grid_ext": "png", "wide_ext": "png", "hero_ext": "png", "logo_ext": "png",
+        "icon_ext": "ico", "grid_ext": "png", "wide_ext": "png",
+        "hero_ext": "png", "logo_ext": "png",
     },
     "nfsmw": {
         "name":           "Need for Speed: Most Wanted",
@@ -88,7 +99,8 @@ NFS_SHORTCUTS = {
         "wide_url":       "https://cdn2.steamgriddb.com/grid/6fdb8f7d90e975d5d19959a0fcebf123.png",
         "hero_url":       "https://cdn2.steamgriddb.com/hero/822b440edda4c46a5e1dad463eaf8ebd.png",
         "logo_url":       "https://cdn2.steamgriddb.com/logo/eb9fc349601c69352c859c1faa287874.png",
-        "icon_ext": "ico", "grid_ext": "png", "wide_ext": "png", "hero_ext": "png", "logo_ext": "png",
+        "icon_ext": "ico", "grid_ext": "png", "wide_ext": "png",
+        "hero_ext": "png", "logo_ext": "png",
     },
     "nfsc": {
         "name":           "Need for Speed: Carbon",
@@ -98,12 +110,13 @@ NFS_SHORTCUTS = {
         "wide_url":       "https://cdn2.steamgriddb.com/grid/ee955e252af3c85e66e15864e31174fe.png",
         "hero_url":       "https://cdn2.steamgriddb.com/hero/4dff7cccfc092f41b8170fc6d7dc93c0.jpg",
         "logo_url":       "https://cdn2.steamgriddb.com/logo/fdf1bc5669e8ff5ba45d02fded729feb.png",
-        "icon_ext": "ico", "grid_ext": "png", "wide_ext": "png", "hero_ext": "jpg", "logo_ext": "png",
+        "icon_ext": "ico", "grid_ext": "png", "wide_ext": "png",
+        "hero_ext": "jpg", "logo_ext": "png",
     },
 }
 
 
-# -- Helpers -------------------------------------------------------------------
+# -- Helpers ------------------------------------------------------------------
 
 def _find_all_steam_uids():
     """Return all valid Steam user ID folders from userdata/."""
@@ -167,7 +180,7 @@ def _download(url: str, dest: str) -> bool:
         return False
 
 
-# -- Binary VDF helpers --------------------------------------------------------
+# -- Binary VDF helpers -------------------------------------------------------
 
 def _vdf_string(key: str, val: str) -> bytes:
     """Encode a string field for binary VDF."""
@@ -208,7 +221,7 @@ def _read_existing_shortcuts(path: str) -> list:
         with open(path, 'rb') as f:
             data = f.read()
     except Exception:
-        _log.debug("operation failed", exc_info=True)
+        _log.debug("shortcuts.vdf read failed", exc_info=True)
         return []
 
     # Extract AppName values
@@ -231,13 +244,13 @@ def _read_shortcuts_raw(path: str) -> bytes:
         _log.debug("shortcuts.vdf read failed", exc_info=True)
         return b''
 
-    # Strip header (b'\x00shortcuts\x00') and the root block terminator (single \x08).
-    # Each entry already carries its own \x08 close byte — only the final
-    # \x08 that closes the 'shortcuts' root block needs stripping.
+    # Strip header (b'\x00shortcuts\x00') and footer (b'\x08\x08')
     header = b'\x00shortcuts\x00'
     if data.startswith(header):
         data = data[len(header):]
-    if data.endswith(b'\x08'):
+    if data.endswith(b'\x08\x08'):
+        data = data[:-2]
+    elif data.endswith(b'\x08'):
         data = data[:-1]
 
     return data
@@ -250,7 +263,7 @@ def _get_next_index(raw_data: bytes) -> int:
     Shortcut entries start with the byte sequence: 0x00 <index_str> 0x00
     immediately followed by 0x02 (the appid int field marker). This two-byte
     lookahead distinguishes real entry headers from the many other 0x00...0x00
-    numeric sequences present in binary VDF data (string lengths, field values, etc.).
+    numeric sequences present in binary VDF data.
     """
     if not raw_data:
         return 0
@@ -261,8 +274,6 @@ def _get_next_index(raw_data: bytes) -> int:
         if raw_data[i] == 0x00:
             end = raw_data.find(b'\x00', i + 1)
             if end != -1 and end > i + 1:
-                # Only treat as an entry index if immediately followed by
-                # 0x02 (int32 field type byte for the 'appid' field header)
                 if end + 1 < len(raw_data) and raw_data[end + 1] == 0x02:
                     try:
                         idx_str = raw_data[i + 1:end].decode('utf-8')
@@ -301,13 +312,13 @@ def _write_shortcuts_vdf(path: str, existing_raw: bytes, new_entries: list):
     for entry_bytes in new_entries:
         data += entry_bytes
 
-    data += b'\x08'
+    data += b'\x08\x08'
 
     with open(path, 'wb') as f:
         f.write(data)
 
 
-# -- Artwork download ----------------------------------------------------------
+# -- Artwork download ---------------------------------------------------------
 
 def _download_artwork(grid_dir: str, appid: int, shortcut_def: dict, prog,
                       force: bool = False, clean_stale: bool = False):
@@ -316,8 +327,7 @@ def _download_artwork(grid_dir: str, appid: int, shortcut_def: dict, prog,
     force       - if True, re-download even if the file already exists on disk.
     clean_stale - if True, delete all existing {appid}* files in grid_dir
                   before downloading. Handles extension changes between
-                  versions (e.g. old .jpg -> new .png) that would otherwise
-                  leave orphans Steam might pick up instead of the new files.
+                  versions that would otherwise leave orphans.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -333,7 +343,7 @@ def _download_artwork(grid_dir: str, appid: int, shortcut_def: dict, prog,
                 except OSError:
                     _log.debug("file removal failed", exc_info=True)
         except Exception:
-            _log.debug("file removal failed", exc_info=True)
+            _log.debug("stale artwork cleanup failed", exc_info=True)
 
     artwork_map = [
         ("icon_url",  f"{appid_str}_icon.{shortcut_def['icon_ext']}",  "icon"),
@@ -351,7 +361,7 @@ def _download_artwork(grid_dir: str, appid: int, shortcut_def: dict, prog,
             continue
         dest = os.path.join(grid_dir, filename)
         if not force and os.path.exists(dest):
-            prog(f"    ✓ {label} (cached)")
+            prog(f"    ok  {label} (cached)")
             continue
         to_download.append((url, dest, label))
 
@@ -365,182 +375,41 @@ def _download_artwork(grid_dir: str, appid: int, shortcut_def: dict, prog,
         ok = _download(url, dest)
         with results_lock:
             if ok:
-                prog(f"    ✓ {label}")
+                prog(f"    ok  {label}")
             else:
-                prog(f"    ⚠ {label} failed")
+                prog(f"    !!  {label} failed")
 
     with ThreadPoolExecutor(max_workers=min(5, len(to_download))) as ex:
         futs = [ex.submit(_dl, url, dest, label) for url, dest, label in to_download]
         for fut in as_completed(futs):
-            # Exceptions are logged inside _dl, but catch anything unexpected
             try:
                 fut.result()
             except Exception:
                 _log.debug("artwork download task failed", exc_info=True)
 
 
-# -- Controller template assignment -------------------------------------------
-
-def _get_template_filename(template_type: str, gyro_mode: str) -> str:
-    """Return the controller template filename based on type and gyro mode.
-
-    NFS games all use the racing profile. Gyro on = tilt steering assist,
-    gyro off = sticks only.
-    """
-    suffix = "gyro" if gyro_mode == "on" else "off"
-    return f"controller_neptune_nfsblacklist_racing_{suffix}.vdf"
-
+# -- Controller template assignment (Phase 4 stub) ---------------------------
+# When racing controller VDFs are ready, this function will copy the template
+# to the per-appid config directory and patch configset VDFs, same as DeckOps.
+# For now it's a no-op so the rest of the shortcut pipeline can be tested.
 
 def _assign_controller_config(uid: str, appid: int, shortcut_def: dict,
                                gyro_mode: str, prog):
     """
     Assign controller template for a non-Steam shortcut.
 
-    We write to both configset_controller_neptune.vdf and the Deck's
-    serial-specific configset. SteamOS in Game Mode reads from the serial
-    file, so without it the profile only works in Desktop Mode.
-    This mirrors what controller_profiles.py does for regular Steam games.
+    Phase 4 stub - logs a skip message. When racing VDFs land in
+    assets/controllers/, this will copy the template and patch:
+      - configset_controller_neptune.vdf
+      - configset_{serial}.vdf (for Game Mode on Deck)
+
+    The function signature matches the DeckOps pattern so Phase 4
+    just fills in the body.
     """
-    template_type = shortcut_def.get("template_type", "racing")
-    template_filename = _get_template_filename(template_type, gyro_mode)
-
-    src_template = os.path.join(ASSETS_DIR, template_filename)
-    if not os.path.exists(src_template):
-        prog(f"    ⚠ Template not found: {template_filename}")
-        return
-
-    appid_str = str(appid)
-
-    # Path: Steam Controller Configs/<uid>/config/<appid>/
-    steam_cfg_root = os.path.join(
-        STEAM_ROOT, "steamapps", "common",
-        "Steam Controller Configs", uid, "config"
-    )
-    cfg_dir = os.path.join(steam_cfg_root, appid_str)
-    os.makedirs(cfg_dir, exist_ok=True)
-    shutil.copy2(src_template, os.path.join(cfg_dir, "controller_neptune.vdf"))
-
-    # Patch configset_controller_neptune.vdf
-    configset_path = os.path.join(steam_cfg_root, "configset_controller_neptune.vdf")
-    _patch_configset(configset_path, appid_str, template_filename)
-
-    # Patch configset_{serial}.vdf - SteamOS on Deck reads from this file
-    serial = _get_deck_serial()
-    if serial:
-        configset_serial = os.path.join(steam_cfg_root, f"configset_{serial}.vdf")
-        _patch_configset(configset_serial, appid_str, template_filename)
-
-    prog(f"    ✓ Controller: {template_filename}")
+    prog(f"    --  Controller config skipped (Phase 4)")
 
 
-def _record_configset_edit(configset_path: str, key: str, template_name: str):
-    """Record a configset VDF edit in the wrapper ledger."""
-    try:
-        from wrapper import _record_configset
-        filename = os.path.basename(configset_path)
-        _record_configset(filename, key, template_name)
-    except Exception:
-        _log.debug("configset ledger record failed", exc_info=True)
-
-
-def _patch_configset(configset_path: str, key: str, template_name: str):
-    """
-    Patch configset_controller_neptune.vdf to set our template as default.
-    Duplicated from controller_profiles.py because shortcut.py runs
-    standalone and should not import from the controller module.
-    """
-    entry = f'\t"{key}"\n\t{{\n\t\t"template"\t\t"{template_name}"\n\t}}\n'
-
-    if not os.path.exists(configset_path):
-        os.makedirs(os.path.dirname(configset_path), exist_ok=True)
-        with open(configset_path, "w", encoding="utf-8") as f:
-            f.write('"controller_config"\n{\n' + entry + '}\n')
-        _record_configset_edit(configset_path, key, template_name)
-        return
-
-    with open(configset_path, "r", encoding="utf-8", errors="replace") as f:
-        content = f.read()
-
-    pattern = rf'\t"{re.escape(key)}"\n\t\{{[^}}]*\}}\n?'
-    if re.search(pattern, content, re.MULTILINE | re.DOTALL):
-        content = re.sub(pattern, entry, content, flags=re.MULTILINE | re.DOTALL)
-    else:
-        content = content.rstrip()
-        if content.endswith("}"):
-            content = content[:-1].rstrip() + "\n" + entry + "}\n"
-
-    with open(configset_path, "w", encoding="utf-8") as f:
-        f.write(content)
-    _record_configset_edit(configset_path, key, template_name)
-
-
-def _clear_compat_tool(appid_str: str):
-    """
-    Remove any CompatToolMapping entry for the given appid from config.vdf.
-
-    Delegates to wrapper.clear_compat_tool() so the write goes through
-    _write_and_validate_vdf() with brace-balance checking and auto-restore.
-    """
-    from wrapper import clear_compat_tool
-    clear_compat_tool([appid_str])
-
-
-# -- Shortcut appid lookup ----------------------------------------------------
-
-def get_shortcut_appid(name: str) -> int | None:
-    """
-    Look up the actual appid of a non-Steam shortcut by its display name.
-
-    Reads shortcuts.vdf for all Steam user accounts and returns the unsigned
-    appid if a matching entry is found. Returns None if the shortcut doesn't
-    exist yet.
-
-    This is more reliable than recalculating the CRC because the appid in
-    shortcuts.vdf is the one Steam actually uses for the prefix, artwork,
-    and controller config - even if the exe path has changed since creation.
-    """
-    uids = _find_all_steam_uids()
-    name_bytes = name.encode("utf-8")
-
-    for uid in uids:
-        shortcuts_path = os.path.join(USERDATA_DIR, uid, "config", "shortcuts.vdf")
-        if not os.path.exists(shortcuts_path):
-            continue
-
-        try:
-            with open(shortcuts_path, "rb") as f:
-                data = f.read()
-        except Exception:
-            _log.debug("shortcuts.vdf read failed", exc_info=True)
-            continue
-
-        idx = data.find(name_bytes)
-        if idx == -1:
-            continue
-
-        # The appid int32 field is before the AppName field.
-        # Search backward from the name for the appid marker.
-        # Binary VDF: \x02appid\x00<4 bytes signed int32>
-        search_start = max(0, idx - 80)
-        chunk = data[search_start:idx]
-        marker = b'\x02appid\x00'
-        marker_pos = chunk.rfind(marker)
-        if marker_pos == -1:
-            continue
-
-        appid_offset = marker_pos + len(marker)
-        if appid_offset + 4 > len(chunk):
-            continue
-
-        signed = struct.unpack_from("<i", chunk, appid_offset)[0]
-        unsigned = signed if signed >= 0 else signed + 2**32
-        return unsigned
-
-    return None
-
-
-# -- Entry-stripping helper (rewrite-on-collision support) ---------------------
-#
+# -- Entry-stripping helper (rewrite-on-collision support) -------------------
 # When a shortcut with a matching AppName already exists, we strip the stale
 # entry from the raw VDF body and re-index the remaining entries so the new
 # write can append a fresh entry with correct Exe / LaunchOptions / StartDir.
@@ -560,14 +429,8 @@ def _strip_entries_by_name(raw_body: bytes, names_to_strip: set) -> tuple:
     if not raw_body or not names_to_strip:
         return raw_body, set()
 
-    # Only treat as an entry boundary if immediately followed by
-    # 0x02 (int32 field type byte for the 'appid' field header).
-    # Same lookahead used in _get_next_index.
-    entry_starts = []
-    for m in re.finditer(rb'\x00\d+\x00', raw_body):
-        after = m.end()
-        if after < len(raw_body) and raw_body[after] == 0x02:
-            entry_starts.append(m.start())
+    # Find entry boundaries
+    entry_starts = [m.start() for m in re.finditer(rb'\x00\d+\x00', raw_body)]
     if not entry_starts:
         return raw_body, set()
 
@@ -579,9 +442,6 @@ def _strip_entries_by_name(raw_body: bytes, names_to_strip: set) -> tuple:
     kept = []
     stripped = set()
     for entry in entries:
-        # Check if this entry's AppName matches anything we want to strip.
-        # Match the full "\x01AppName\x00NAME\x00" sequence so partial
-        # substring matches do not trigger a false strip.
         matched_name = None
         for name in names_to_strip:
             name_bytes = name.encode("utf-8")
@@ -610,259 +470,25 @@ def _strip_entries_by_name(raw_body: bytes, names_to_strip: set) -> tuple:
     return b''.join(reindexed), stripped
 
 
-# -- Generic shortcut API ------------------------------------------------------
-#
-# add_shortcut / remove_shortcut are the single-shortcut building blocks.
-# Higher-level functions like write_own_shortcuts batch multiple shortcuts
-# per VDF write. These generic functions write one shortcut at a time.
-
-def add_shortcut(
-    name: str,
-    exe_path: str,
-    start_dir: str,
-    launch_options: str,
-    artwork_def: dict,
-    template_type: str,
-    gyro_mode: str,
-    on_progress=None,
-    compat_tool: str = None,
-    clear_compat: bool = False,
-    force_artwork: bool = False,
-    appid_exe_path: str = None,
-) -> int:
-    """
-    Create a single non-Steam shortcut across all Steam UIDs.
-
-    Returns the unsigned shortcut appid.
-
-    name             - display name (AppName in shortcuts.vdf)
-    exe_path         - quoted exe path for the shortcut entry
-    start_dir        - quoted StartDir for the shortcut entry
-    launch_options   - LaunchOptions string
-    artwork_def      - dict with icon_url, grid_url, wide_url, hero_url,
-                        logo_url and corresponding *_ext keys
-    template_type    - "racing" for NFS games
-    gyro_mode        - "on" or "off"
-    on_progress      - optional callback(msg: str)
-    compat_tool      - GE-Proton version to set, or None to skip
-    clear_compat     - if True, remove any existing compat tool entry
-    force_artwork    - re-download even if cached
-    appid_exe_path   - if provided, use this instead of exe_path for the
-                        appid CRC calculation (for stable appids when the
-                        actual exe differs from the original shortcut exe)
-    """
-    def prog(msg):
-        if on_progress:
-            on_progress(msg)
-
-    appid_key = appid_exe_path if appid_exe_path else exe_path
-    shortcut_appid = _calc_shortcut_appid(appid_key, name)
-
-    uids = _find_all_steam_uids()
-    if not uids:
-        prog("  No Steam user accounts found - shortcut skipped.")
-        return shortcut_appid
-
-    for uid in uids:
-        shortcuts_path = os.path.join(USERDATA_DIR, uid, "config", "shortcuts.vdf")
-        grid_dir = os.path.join(USERDATA_DIR, uid, "config", "grid")
-
-        existing_names = _read_existing_shortcuts(shortcuts_path)
-        existing_raw = _read_shortcuts_raw(shortcuts_path)
-
-        # If a shortcut with this name already exists, strip its entry from
-        # the raw body so we can write a fresh one with current Exe /
-        # StartDir / LaunchOptions.
-        replaced = False
-        if name in existing_names:
-            existing_raw, stripped = _strip_entries_by_name(
-                existing_raw, {name}
-            )
-            if stripped:
-                replaced = True
-
-        next_idx = _get_next_index(existing_raw)
-
-        icon_path = os.path.join(
-            grid_dir,
-            f"{shortcut_appid}_icon.{artwork_def.get('icon_ext', 'png')}",
-        )
-
-        entry = {
-            "appid":               _to_signed32(shortcut_appid),
-            "AppName":             name,
-            "Exe":                 exe_path,
-            "StartDir":            start_dir,
-            "icon":                icon_path,
-            "ShortcutPath":        "",
-            "LaunchOptions":       launch_options,
-            "IsHidden":            0,
-            "AllowDesktopConfig":  1,
-            "AllowOverlay":        1,
-            "OpenVR":              0,
-            "Devkit":              0,
-            "DevkitGameID":        "",
-            "DevkitOverrideAppID": 0,
-            "LastPlayTime":        int(time.time()),
-            "FlatpakAppID":        "",
-            "tags":                {"0": "NFSBlacklist"},
-        }
-
-        entry_bytes = _make_shortcut_entry(next_idx, entry)
-        try:
-            _write_shortcuts_vdf(shortcuts_path, existing_raw, [entry_bytes])
-            if replaced:
-                prog(f"    ✓ Shortcut replaced: {name}")
-            else:
-                prog(f"    ✓ Shortcut created: {name}")
-        except Exception as e:
-            prog(f"    ⚠ Failed to write shortcut: {e}")
-
-        # Artwork
-        _download_artwork(grid_dir, shortcut_appid, artwork_def, prog,
-                          force=force_artwork, clean_stale=force_artwork)
-
-        # Controller config
-        _assign_controller_config(uid, shortcut_appid,
-                                  {"template_type": template_type},
-                                  gyro_mode, prog)
-
-    # Compat tool handling (config.vdf is global, outside UID loop)
-    if clear_compat:
-        try:
-            _clear_compat_tool(str(shortcut_appid))
-            prog(f"    Cleared compat tool for shortcut")
-        except Exception as ex:
-            prog(f"    Could not clear compat tool: {ex}")
-    elif compat_tool:
-        try:
-            from wrapper import set_compat_tool as _set_compat
-            _set_compat([str(shortcut_appid)], compat_tool)
-            prog(f"    ✓ GE-Proton {compat_tool} set")
-        except Exception as ex:
-            prog(f"    ⚠ Could not set compat tool: {ex}")
-
-    prog(f"  Shortcut appid: {shortcut_appid}")
-    return shortcut_appid
-
-
-def remove_shortcut(name: str, exe_path: str, artwork_def: dict = None,
-                    on_progress=None):
-    """
-    Remove a non-Steam shortcut by name from shortcuts.vdf for all UIDs.
-    Also removes associated artwork from the grid directory.
-
-    name        - AppName to match in shortcuts.vdf
-    exe_path    - quoted exe path used for appid CRC (needed for artwork
-                   file cleanup - artwork filenames are keyed on appid)
-    artwork_def - dict with *_ext keys for artwork file removal;
-                   if None, artwork files are left in place
-    on_progress - optional callback(msg: str)
-    """
-    def prog(msg):
-        if on_progress:
-            on_progress(msg)
-
-    shortcut_appid = _calc_shortcut_appid(exe_path, name)
-
-    uids = _find_all_steam_uids()
-    if not uids:
-        return
-
-    for uid in uids:
-        shortcuts_path = os.path.join(USERDATA_DIR, uid, "config", "shortcuts.vdf")
-        grid_dir = os.path.join(USERDATA_DIR, uid, "config", "grid")
-
-        if not os.path.exists(shortcuts_path):
-            continue
-
-        try:
-            with open(shortcuts_path, "rb") as f:
-                data = f.read()
-        except OSError:
-            _log.debug("shortcuts.vdf read failed", exc_info=True)
-            continue
-
-        header = b'\x00shortcuts\x00'
-        footer = b'\x08'
-
-        body = data
-        if body.startswith(header):
-            body = body[len(header):]
-        if body.endswith(b'\x08'):
-            body = body[:-1]
-
-        entry_starts = []
-        for m in re.finditer(rb'\x00\d+\x00', body):
-            after = m.end()
-            if after < len(body) and body[after] == 0x02:
-                entry_starts.append(m.start())
-        if not entry_starts:
-            continue
-
-        entries = []
-        for i, start in enumerate(entry_starts):
-            end = entry_starts[i + 1] if i + 1 < len(entry_starts) else len(body)
-            entries.append(body[start:end])
-
-        title_bytes = name.encode("utf-8")
-        filtered = [
-            e for e in entries
-            if b'\x01AppName\x00' + title_bytes + b'\x00' not in e
-            and b'\x01appname\x00' + title_bytes + b'\x00' not in e
-        ]
-
-        if len(filtered) < len(entries):
-            reindexed = []
-            for new_idx, entry in enumerate(filtered):
-                entry = re.sub(
-                    rb'^\x00\d+\x00',
-                    f'\x00{new_idx}\x00'.encode(),
-                    entry,
-                )
-                reindexed.append(entry)
-            new_data = header + b''.join(reindexed) + footer
-            try:
-                _backup_file(shortcuts_path)
-                with open(shortcuts_path, "wb") as f:
-                    f.write(new_data)
-                prog(f"  Removed shortcut '{name}' for uid {uid}")
-            except OSError as ex:
-                prog(f"  Could not write shortcuts.vdf: {ex}")
-
-        # Remove artwork
-        if artwork_def:
-            artwork_suffixes = [
-                f"_icon.{artwork_def.get('icon_ext', 'png')}",
-                f"p.{artwork_def.get('grid_ext', 'jpg')}",
-                f".{artwork_def.get('wide_ext', 'jpg')}",
-                f"_hero.{artwork_def.get('hero_ext', 'jpg')}",
-                f"_logo.{artwork_def.get('logo_ext', 'png')}",
-            ]
-            for suffix in artwork_suffixes:
-                art_path = os.path.join(grid_dir, f"{shortcut_appid}{suffix}")
-                if os.path.exists(art_path):
-                    try:
-                        os.remove(art_path)
-                    except OSError:
-                        _log.debug("file removal failed", exc_info=True)
-
-
-# -- Public API ----------------------------------------------------------------
+# -- Public API ---------------------------------------------------------------
 
 def enrich_own_games(own_games: dict, selected_keys: list,
                      on_progress=None):
     """
-    Compute shortcut appids, compatdata paths, resolved exe paths, and
-    launch options for own games - WITHOUT writing any VDF entries,
-    artwork, controller configs, or compat tool mappings.
+    Compute shortcut appids, compatdata paths, and launch options for
+    own games - WITHOUT writing any VDF entries, artwork, or configs.
 
     Must run early in the install flow so prefix creation can use the
     computed compatdata_path. The actual shortcut writing is deferred to
     write_own_shortcuts(), which should run AFTER all mod installs so
     every target exe exists on disk.
 
-    own_games     - dict {key: game_dict} from detect_games / OwnScanScreen
+    All four NFS games use the same launch pattern:
+      - Direct exe launch via GE-Proton
+      - STEAM_COMPAT_DATA_PATH for the prefix
+      - WINEDLLOVERRIDES="dinput8=n,b" for the ASI loader
+
+    own_games     - dict {key: game_dict} from detect_games
     selected_keys - list of game keys the user selected
     on_progress   - optional callback(msg: str)
 
@@ -873,8 +499,6 @@ def enrich_own_games(own_games: dict, selected_keys: list,
     def prog(msg):
         if on_progress:
             on_progress(msg)
-
-    from detect_games import GAMES
 
     for key in selected_keys:
         if key not in NFS_SHORTCUTS:
@@ -891,28 +515,26 @@ def enrich_own_games(own_games: dict, selected_keys: list,
         exe_path     = game["exe_path"]
 
         # Calculate appid from quoted exe + canonical name.
-        # Gotcha: must use quoted path '"path/to/exe"' not 'path/to/exe'
+        # Must use quoted exe path - this is how Steam calculates the CRC.
         quoted_exe     = f'"{exe_path}"'
         shortcut_appid = _calc_shortcut_appid(quoted_exe, name)
 
-        # Own games get their own CRC-based prefix keyed on the shortcut appid
+        # Own games always get their own CRC-based prefix
         compatdata_path = os.path.join(COMPAT_ROOT, str(shortcut_appid))
 
-        # Enrich the game dict so downstream code has the appid and paths
+        # Enrich the game dict
         game["shortcut_appid"]  = shortcut_appid
         game["compatdata_path"] = compatdata_path
         game["source"]          = "own"
         game["current_name"]    = name
 
-        # NFS games all launch directly via their exe through Proton.
-        # No mod clients redirect the exe (unlike CoD Plutonium/IW4x).
-        # STEAM_COMPAT_DATA_PATH tells Proton which prefix to use.
-        actual_exe     = exe_path
-        launch_options = f'STEAM_COMPAT_DATA_PATH="{compatdata_path}" WINEDLLOVERRIDES="dinput8=n,b" %command%'
-
-        # Store resolved values for write_own_shortcuts() to use later
-        game["_own_actual_exe"]     = actual_exe
-        game["_own_launch_options"] = launch_options
+        # All NFS games use the same launch pattern: direct exe via GE-Proton
+        # with WINEDLLOVERRIDES for the ASI loader (dinput8.dll)
+        game["_own_actual_exe"]     = exe_path
+        game["_own_launch_options"] = (
+            f'STEAM_COMPAT_DATA_PATH="{compatdata_path}" '
+            f'WINEDLLOVERRIDES="dinput8=n,b" %command%'
+        )
 
         prog(f"  -> {name}  appid: {shortcut_appid}")
 
@@ -957,11 +579,11 @@ def write_own_shortcuts(own_games: dict, selected_keys: list,
 
     uids = _find_all_steam_uids()
     if not uids:
-        prog("⚠ No Steam user accounts found - shortcuts skipped.")
+        prog("!!  No Steam user accounts found - own shortcuts skipped.")
         return
 
     for uid in uids:
-        prog(f"Writing NFS shortcuts for user {uid}...")
+        prog(f"Writing shortcuts for user {uid}...")
 
         shortcuts_path = os.path.join(USERDATA_DIR, uid, "config", "shortcuts.vdf")
         grid_dir = os.path.join(USERDATA_DIR, uid, "config", "grid")
@@ -999,13 +621,13 @@ def write_own_shortcuts(own_games: dict, selected_keys: list,
 
             if not os.path.exists(actual_exe):
                 prog(f"  -> {name}")
-                prog(f"    ⚠ {os.path.basename(actual_exe)} not found - shortcut will be created anyway")
+                prog(f"    !!  {os.path.basename(actual_exe)} not found - shortcut will be created anyway")
             else:
                 prog(f"  -> {name}")
             prog(f"    appid: {shortcut_appid}")
 
             if name in existing_names:
-                prog(f"    ⚠ Unexpected name collision after strip")
+                prog(f"    !!  Unexpected name collision after strip")
 
             entry = {
                 "appid":               _to_signed32(shortcut_appid),
@@ -1022,7 +644,7 @@ def write_own_shortcuts(own_games: dict, selected_keys: list,
                 "Devkit":              0,
                 "DevkitGameID":        "",
                 "DevkitOverrideAppID": 0,
-                "LastPlayTime":        int(time.time()),
+                "LastPlayTime":        0,
                 "FlatpakAppID":        "",
                 "tags":                {"0": "NFSBlacklist"},
             }
@@ -1030,13 +652,13 @@ def write_own_shortcuts(own_games: dict, selected_keys: list,
             entry_bytes = _make_shortcut_entry(next_idx, entry)
             new_entries.append(entry_bytes)
             next_idx += 1
-            prog(f"    ✓ Shortcut created")
+            prog(f"    ok  Shortcut created")
 
             # Download artwork
             _download_artwork(grid_dir, shortcut_appid, shortcut_def, prog,
                               force=True, clean_stale=True)
 
-            # Assign controller config
+            # Controller config (Phase 4 stub)
             _assign_controller_config(uid, shortcut_appid, shortcut_def, gyro_mode, prog)
 
             # Set GE-Proton compat tool
@@ -1046,34 +668,158 @@ def write_own_shortcuts(own_games: dict, selected_keys: list,
                 ge_version = _cfg.get_ge_proton_version()
                 if ge_version:
                     set_compat_tool([str(shortcut_appid)], ge_version)
-                    prog(f"    ✓ GE-Proton {ge_version} set")
+                    prog(f"    ok  GE-Proton {ge_version} set")
+                else:
+                    prog(f"    !!  GE-Proton version unknown - compat tool not set")
             except Exception as ex:
-                prog(f"    ⚠ Could not set GE-Proton: {ex}")
+                prog(f"    !!  Could not set GE-Proton: {ex}")
 
         if new_entries:
             try:
                 _write_shortcuts_vdf(shortcuts_path, existing_raw, new_entries)
-                prog(f"  ✓ shortcuts.vdf saved")
+                prog(f"  ok  shortcuts.vdf saved")
             except Exception as e:
-                prog(f"  ⚠ Failed to write shortcuts.vdf: {e}")
+                prog(f"  !!  Failed to write shortcuts.vdf: {e}")
         else:
-            prog(f"  ✓ No new shortcuts needed")
+            prog(f"  ok  No new shortcuts needed")
 
-    prog("✓ Non-Steam shortcuts written.")
+    prog("ok  Own game shortcuts written.")
 
 
-def create_own_shortcuts(own_games: dict, selected_keys: list,
-                        gyro_mode: str, on_progress=None):
+def remove_shortcut(name: str, exe_path: str, artwork_def: dict = None,
+                    on_progress=None):
     """
-    Legacy wrapper - enriches own game dicts AND writes shortcuts in one
-    call. Kept for backward compatibility. New code should call
-    enrich_own_games() early and write_own_shortcuts() after installs.
+    Remove a non-Steam shortcut by name from shortcuts.vdf for all UIDs.
+    Also removes associated artwork from the grid directory.
 
-    Returns own_games dict enriched with shortcut_appid, compatdata_path,
-    and source fields.
+    name        - AppName to match in shortcuts.vdf
+    exe_path    - quoted exe path used for appid CRC (needed for artwork
+                   file cleanup - artwork filenames are keyed on appid)
+    artwork_def - dict with *_ext keys for artwork file removal;
+                   if None, artwork files are left in place
+    on_progress - optional callback(msg: str)
     """
-    own_games = enrich_own_games(own_games, selected_keys,
-                                 on_progress=on_progress)
-    write_own_shortcuts(own_games, selected_keys, gyro_mode,
-                        on_progress=on_progress)
-    return own_games
+    def prog(msg):
+        if on_progress:
+            on_progress(msg)
+
+    shortcut_appid = _calc_shortcut_appid(exe_path, name)
+
+    uids = _find_all_steam_uids()
+    if not uids:
+        return
+
+    for uid in uids:
+        shortcuts_path = os.path.join(USERDATA_DIR, uid, "config", "shortcuts.vdf")
+        grid_dir = os.path.join(USERDATA_DIR, uid, "config", "grid")
+
+        if not os.path.exists(shortcuts_path):
+            continue
+
+        try:
+            with open(shortcuts_path, "rb") as f:
+                data = f.read()
+        except OSError:
+            _log.debug("shortcuts.vdf read failed", exc_info=True)
+            continue
+
+        header = b'\x00shortcuts\x00'
+        footer = b'\x08\x08'
+
+        body = data
+        if body.startswith(header):
+            body = body[len(header):]
+        if body.endswith(footer):
+            body = body[:-2]
+        elif body.endswith(b'\x08'):
+            body = body[:-1]
+
+        entry_starts = [m.start() for m in re.finditer(rb'\x00\d+\x00', body)]
+        if not entry_starts:
+            continue
+
+        entries = []
+        for i, start in enumerate(entry_starts):
+            end = entry_starts[i + 1] if i + 1 < len(entry_starts) else len(body)
+            entries.append(body[start:end])
+
+        title_bytes = name.encode("utf-8")
+        filtered = [
+            e for e in entries
+            if b'\x01AppName\x00' + title_bytes + b'\x00' not in e
+            and b'\x01appname\x00' + title_bytes + b'\x00' not in e
+        ]
+
+        if len(filtered) < len(entries):
+            reindexed = []
+            for new_idx, entry in enumerate(filtered):
+                entry = re.sub(
+                    rb'^\x00\d+\x00',
+                    f'\x00{new_idx}\x00'.encode(),
+                    entry,
+                )
+                reindexed.append(entry)
+            new_data = header + b''.join(reindexed) + footer
+            try:
+                _backup_file(shortcuts_path)
+                with open(shortcuts_path, "wb") as f:
+                    f.write(new_data)
+                prog(f"  Removed shortcut '{name}' for uid {uid}")
+            except OSError as ex:
+                prog(f"  Could not write shortcuts.vdf: {ex}")
+
+        # Remove artwork
+        if artwork_def:
+            artwork_suffixes = [
+                f"_icon.{artwork_def.get('icon_ext', 'png')}",
+                f"p.{artwork_def.get('grid_ext', 'png')}",
+                f".{artwork_def.get('wide_ext', 'png')}",
+                f"_hero.{artwork_def.get('hero_ext', 'png')}",
+                f"_logo.{artwork_def.get('logo_ext', 'png')}",
+            ]
+            for suffix in artwork_suffixes:
+                art_path = os.path.join(grid_dir, f"{shortcut_appid}{suffix}")
+                if os.path.exists(art_path):
+                    try:
+                        os.remove(art_path)
+                    except OSError:
+                        _log.debug("file removal failed", exc_info=True)
+
+
+# -- CLI for testing ----------------------------------------------------------
+
+if __name__ == "__main__":
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+    from detect_games import find_own_installed
+
+    print("Finding installed NFS games...")
+    found = find_own_installed(on_progress=print)
+
+    if not found:
+        print("No games found.")
+        sys.exit(1)
+
+    print(f"\nFound {len(found)} game(s)")
+    for key, game in found.items():
+        print(f"  {key}: {game['name']} at {game['install_dir']}")
+
+    print("\nEnriching game data...")
+    enriched = enrich_own_games(found, list(found.keys()), on_progress=print)
+
+    print("\nEnriched data:")
+    for key, game in enriched.items():
+        print(f"  {key}:")
+        print(f"    appid:          {game.get('shortcut_appid')}")
+        print(f"    compatdata:     {game.get('compatdata_path')}")
+        print(f"    exe:            {game.get('_own_actual_exe')}")
+        print(f"    launch_options: {game.get('_own_launch_options')}")
+
+    print("\nCreating shortcuts (test mode)...")
+    write_own_shortcuts(
+        enriched,
+        list(enriched.keys()),
+        gyro_mode="off",
+        on_progress=print,
+    )
