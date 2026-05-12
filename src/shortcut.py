@@ -560,8 +560,14 @@ def _strip_entries_by_name(raw_body: bytes, names_to_strip: set) -> tuple:
     if not raw_body or not names_to_strip:
         return raw_body, set()
 
-    # Find entry boundaries
-    entry_starts = [m.start() for m in re.finditer(rb'\x00\d+\x00', raw_body)]
+    # Only treat as an entry boundary if immediately followed by
+    # 0x02 (int32 field type byte for the 'appid' field header).
+    # Same lookahead used in _get_next_index.
+    entry_starts = []
+    for m in re.finditer(rb'\x00\d+\x00', raw_body):
+        after = m.end()
+        if after < len(raw_body) and raw_body[after] == 0x02:
+            entry_starts.append(m.start())
     if not entry_starts:
         return raw_body, set()
 
@@ -788,7 +794,11 @@ def remove_shortcut(name: str, exe_path: str, artwork_def: dict = None,
         elif body.endswith(b'\x08'):
             body = body[:-1]
 
-        entry_starts = [m.start() for m in re.finditer(rb'\x00\d+\x00', body)]
+        entry_starts = []
+        for m in re.finditer(rb'\x00\d+\x00', body):
+            after = m.end()
+            if after < len(body) and body[after] == 0x02:
+                entry_starts.append(m.start())
         if not entry_starts:
             continue
 

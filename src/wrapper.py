@@ -175,7 +175,7 @@ def _write_and_validate_vdf(path: str, data: str, encoding: str = "utf-8",
     _backup_file(path)
     open_kwargs = {"encoding": encoding}
     if errors:
-        open_kwargs = {"errors": errors}
+        open_kwargs["errors"] = errors
     with open(path, "w", **open_kwargs) as f:
         f.write(data)
     if not _validate_vdf(path):

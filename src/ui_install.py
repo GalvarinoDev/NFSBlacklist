@@ -503,7 +503,7 @@ class OwnInstallScreen(QWidget):
                 ),
             )
             self._s.log.emit(f"  ok  GE-Proton {ge_version}")
-            cfg.update({"ge_proton_version": ge_version})
+            cfg.set_ge_proton_version(ge_version)
         except Exception as e:
             self._s.log.emit(f"  !!  GE-Proton install failed: {e}")
             ge_version = None
