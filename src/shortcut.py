@@ -703,7 +703,7 @@ def add_shortcut(
             "Devkit":              0,
             "DevkitGameID":        "",
             "DevkitOverrideAppID": 0,
-            "LastPlayTime":        0,
+            "LastPlayTime":        int(time.time()),
             "FlatpakAppID":        "",
             "tags":                {"0": "NFSBlacklist"},
         }
@@ -1022,7 +1022,7 @@ def write_own_shortcuts(own_games: dict, selected_keys: list,
                 "Devkit":              0,
                 "DevkitGameID":        "",
                 "DevkitOverrideAppID": 0,
-                "LastPlayTime":        0,
+                "LastPlayTime":        int(time.time()),
                 "FlatpakAppID":        "",
                 "tags":                {"0": "NFSBlacklist"},
             }
