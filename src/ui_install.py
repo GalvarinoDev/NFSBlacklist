@@ -222,6 +222,7 @@ class OwnInstallScreen(QWidget):
          b. Extra Options (all 4) - bug fixes, QoL
          c. XtendedInput (all 4) - native controller support
          d. XenonEffects (NFSMW only) - Xbox 360 visual effects
+      5b. Write display configs (resolution + graphics to Wine registry)
       6. Create non-Steam shortcuts + artwork
       7. Controller templates + profiles (placeholder - not built yet)
       8. Mark games as setup
@@ -461,6 +462,7 @@ class OwnInstallScreen(QWidget):
         import xtended_input
         import xenon_effects
         import shortcut
+        import game_config
         import ge_proton
         import wrapper
 
@@ -599,6 +601,20 @@ class OwnInstallScreen(QWidget):
                     ),
                 )
                 self._s.pulse_stop.emit()
+
+        # -- Step 5b: Write display configs ------------------------------------
+        # Write resolution and graphics settings into each game's Wine prefix
+        # registry (user.reg) before the game is ever launched. Without this,
+        # games default to minimum resolution or crash on settings change (NFSC).
+        self._s.progress.emit(72, "Writing display configs...")
+        self._s.log.emit("-- Display configs --")
+        try:
+            game_config.write_display_configs(
+                selected_keys, self.selected,
+                on_progress=lambda msg: self._s.log.emit(msg),
+            )
+        except Exception as e:
+            self._s.log.emit(f"  !!  Display config error: {e}")
 
         # -- Step 6: Create non-Steam shortcuts --------------------------------
         self._s.progress.emit(75, "Creating non-Steam shortcuts...")
