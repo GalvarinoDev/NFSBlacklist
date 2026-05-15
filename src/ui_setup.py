@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
     QLabel, QPushButton, QLineEdit,
 )
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap
 
 import config as cfg
 
@@ -24,6 +25,11 @@ from ui_constants import (
     go_to, get_screen,
     PROJECT_ROOT,
 )
+
+
+# -- Paths --------------------------------------------------------------------
+
+M3_IMAGE_PATH = os.path.join(PROJECT_ROOT, "assets", "images", "m3.png")
 
 
 # -- Device definitions --------------------------------------------------------
@@ -65,9 +71,16 @@ class SetupFlowScreen(QWidget):
         main_lay.setContentsMargins(0, 0, 0, 0)
 
         # -- 1. OS section -----------------------------------------------------
+        # Two-column layout: left = title + info + buttons, right = M3 GTR image
         self._os_section = QWidget()
-        lay = QVBoxLayout(self._os_section)
-        lay.setContentsMargins(80, 60, 80, 60); lay.setSpacing(16)
+        os_outer = QHBoxLayout(self._os_section)
+        os_outer.setContentsMargins(0, 0, 0, 0)
+        os_outer.setSpacing(0)
+
+        # Left column: all the text and buttons
+        left_panel = QWidget()
+        lay = QVBoxLayout(left_panel)
+        lay.setContentsMargins(80, 60, 40, 60); lay.setSpacing(16)
         _title_block(lay)
         lay.addSpacing(8)
         lay.addWidget(_lbl(
@@ -77,11 +90,11 @@ class SetupFlowScreen(QWidget):
             14, "#CCCCCC"))
         lay.addSpacing(6)
         for warn in [
-            "⚠   NFSBlacklist will automatically create Proton prefixes for your games. "
+            "\u26A0   NFSBlacklist will automatically create Proton prefixes for your games. "
             "You do NOT need to launch each game through Steam first.",
-            "⚠   Make sure your game files are in ~/Games, ~/NFS, or on an SD card "
+            "\u26A0   Make sure your game files are in ~/Games, ~/NFS, or on an SD card "
             "before continuing. NFSBlacklist will scan for them automatically.",
-            "⚠   Make sure you have a stable internet connection before installing. "
+            "\u26A0   Make sure you have a stable internet connection before installing. "
             "Mods and GE-Proton will be downloaded during setup.",
         ]:
             lay.addWidget(_lbl(warn, 13, C_ACCENT2, align=Qt.AlignLeft))
@@ -96,16 +109,36 @@ class SetupFlowScreen(QWidget):
             ("cachyos", "CachyOS"),
         ]:
             b = _btn(label, C_ACCENT1, h=56)
-            b.clicked.connect(lambda checked, k=os_key: self._pick_os(k))
+            b.clicked.connect(lambda _, k=os_key: self._pick_os(k))
             os_row.addWidget(b)
         lay.addLayout(os_row)
+        os_outer.addWidget(left_panel, stretch=3)
+
+        # Right column: M3 GTR image
+        right_panel = QWidget()
+        rlay = QVBoxLayout(right_panel)
+        rlay.setContentsMargins(0, 60, 60, 60)
+        rlay.addStretch()
+        self._m3_label = QLabel()
+        self._m3_label.setAlignment(Qt.AlignCenter)
+        self._m3_label.setStyleSheet("background: transparent;")
+        if os.path.exists(M3_IMAGE_PATH):
+            px = QPixmap(M3_IMAGE_PATH)
+            if not px.isNull():
+                # Scale to reasonable size, keep aspect ratio
+                scaled = px.scaledToWidth(420, Qt.SmoothTransformation)
+                self._m3_label.setPixmap(scaled)
+        rlay.addWidget(self._m3_label)
+        rlay.addStretch()
+        os_outer.addWidget(right_panel, stretch=2)
+
         main_lay.addWidget(self._os_section)
 
         # -- 2. Device model section -------------------------------------------
         self._model_section = QWidget(); self._model_section.setVisible(False)
         ml = QVBoxLayout(self._model_section)
         ml.setContentsMargins(80, 60, 80, 60); ml.setSpacing(16)
-        self._back_os_btn = _btn("← Back", C_DARK_BTN, size=10, h=30)
+        self._back_os_btn = _btn("\u2190 Back", C_DARK_BTN, size=10, h=30)
         self._back_os_btn.setFixedWidth(80)
         self._back_os_btn.clicked.connect(self._back_to_os)
         brow = QHBoxLayout(); brow.addWidget(self._back_os_btn); brow.addStretch()
@@ -120,9 +153,9 @@ class SetupFlowScreen(QWidget):
         oled_btn = _btn("Steam Deck OLED", C_ACCENT1, h=56)
         sm_btn   = _btn("Steam Machine",   C_ACCENT1, h=56)
         other_btn = _btn("Other Device",   C_ACCENT2, h=56)
-        lcd_btn.clicked.connect(lambda: self._pick_device("sd_lcd"))
-        oled_btn.clicked.connect(lambda: self._pick_device("sd_oled"))
-        sm_btn.clicked.connect(lambda: self._pick_device("steam_machine"))
+        lcd_btn.clicked.connect(lambda _: self._pick_device("sd_lcd"))
+        oled_btn.clicked.connect(lambda _: self._pick_device("sd_oled"))
+        sm_btn.clicked.connect(lambda _: self._pick_device("steam_machine"))
         other_btn.clicked.connect(self._show_device_picker)
         mrow.addWidget(lcd_btn); mrow.addWidget(oled_btn); mrow.addWidget(sm_btn); mrow.addWidget(other_btn)
         ml.addLayout(mrow)
@@ -133,7 +166,7 @@ class SetupFlowScreen(QWidget):
         self._device_section = QWidget(); self._device_section.setVisible(False)
         dvl = QVBoxLayout(self._device_section)
         dvl.setContentsMargins(80, 60, 80, 60); dvl.setSpacing(16)
-        self._back_model_btn = _btn("← Back", C_DARK_BTN, size=10, h=30)
+        self._back_model_btn = _btn("\u2190 Back", C_DARK_BTN, size=10, h=30)
         self._back_model_btn.setFixedWidth(80)
         self._back_model_btn.clicked.connect(self._back_to_model)
         brow2 = QHBoxLayout(); brow2.addWidget(self._back_model_btn); brow2.addStretch()
@@ -153,32 +186,32 @@ class SetupFlowScreen(QWidget):
 
         # Left column: Lenovo
         col_lenovo = QVBoxLayout(); col_lenovo.setSpacing(10)
-        col_lenovo.addWidget(_lbl("Lenovo", 12, C_ACCENT2, bold=True))
+        col_lenovo.addWidget(_lbl("Lenovo", 12, C_DIM, bold=True))
         for dev_key in ("legion_go", "legion_go_s", "legion_go_2"):
             b = _btn(DEVICES[dev_key]["label"], C_DARK_BTN, h=48)
-            b.clicked.connect(lambda checked, k=dev_key: self._pick_device(k))
+            b.clicked.connect(lambda _, k=dev_key: self._pick_device(k))
             col_lenovo.addWidget(b)
         dev_cols.addLayout(col_lenovo)
 
         # Middle column: ASUS
         col_asus = QVBoxLayout(); col_asus.setSpacing(10)
-        col_asus.addWidget(_lbl("ASUS", 12, C_ACCENT2, bold=True))
+        col_asus.addWidget(_lbl("ASUS", 12, C_DIM, bold=True))
         for dev_key in ("rog_ally", "rog_ally_x", "xbox_ally_x"):
             b = _btn(DEVICES[dev_key]["label"], C_DARK_BTN, h=48)
-            b.clicked.connect(lambda checked, k=dev_key: self._pick_device(k))
+            b.clicked.connect(lambda _, k=dev_key: self._pick_device(k))
             col_asus.addWidget(b)
         dev_cols.addLayout(col_asus)
 
         # Right column: MSI + PC
         col_right = QVBoxLayout(); col_right.setSpacing(10)
-        col_right.addWidget(_lbl("MSI", 12, C_ACCENT2, bold=True))
+        col_right.addWidget(_lbl("MSI", 12, C_DIM, bold=True))
         msi_btn = _btn(DEVICES["msi_claw_8"]["label"], C_DARK_BTN, h=48)
-        msi_btn.clicked.connect(lambda: self._pick_device("msi_claw_8"))
+        msi_btn.clicked.connect(lambda _: self._pick_device("msi_claw_8"))
         col_right.addWidget(msi_btn)
         col_right.addSpacing(10)
-        col_right.addWidget(_lbl("Other", 12, C_ACCENT2, bold=True))
+        col_right.addWidget(_lbl("Other", 12, C_DIM, bold=True))
         pc_btn = _btn("PC", C_DARK_BTN, h=48)
-        pc_btn.clicked.connect(lambda: self._pick_device("general_pc"))
+        pc_btn.clicked.connect(lambda _: self._pick_device("general_pc"))
         col_right.addWidget(pc_btn)
         dev_cols.addLayout(col_right)
 
@@ -190,7 +223,7 @@ class SetupFlowScreen(QWidget):
         self._gyro_section = QWidget(); self._gyro_section.setVisible(False)
         gl = QVBoxLayout(self._gyro_section)
         gl.setContentsMargins(80, 60, 80, 60); gl.setSpacing(16)
-        self._back_device_gyro_btn = _btn("← Back", C_DARK_BTN, size=10, h=30)
+        self._back_device_gyro_btn = _btn("\u2190 Back", C_DARK_BTN, size=10, h=30)
         self._back_device_gyro_btn.setFixedWidth(80)
         self._back_device_gyro_btn.clicked.connect(self._back_to_device_from_gyro)
         brow3 = QHBoxLayout(); brow3.addWidget(self._back_device_gyro_btn); brow3.addStretch()
@@ -208,8 +241,8 @@ class SetupFlowScreen(QWidget):
         grow = QHBoxLayout(); grow.setSpacing(20)
         gyro_yes = _btn("Yes", C_ACCENT1, h=56)
         gyro_no  = _btn("No",  C_DARK_BTN, h=56)
-        gyro_yes.clicked.connect(lambda: self._pick_gyro("on"))
-        gyro_no.clicked.connect(lambda: self._pick_gyro("off"))
+        gyro_yes.clicked.connect(lambda _: self._pick_gyro("on"))
+        gyro_no.clicked.connect(lambda _: self._pick_gyro("off"))
         grow.addWidget(gyro_yes); grow.addWidget(gyro_no)
         gl.addLayout(grow)
         gl.addSpacing(40)
@@ -219,7 +252,7 @@ class SetupFlowScreen(QWidget):
         self._name_section = QWidget(); self._name_section.setVisible(False)
         nl = QVBoxLayout(self._name_section)
         nl.setContentsMargins(80, 60, 80, 60); nl.setSpacing(16)
-        self._back_gyro_name_btn = _btn("← Back", C_DARK_BTN, size=10, h=30)
+        self._back_gyro_name_btn = _btn("\u2190 Back", C_DARK_BTN, size=10, h=30)
         self._back_gyro_name_btn.setFixedWidth(80)
         self._back_gyro_name_btn.clicked.connect(self._back_to_gyro_from_name)
         brow4 = QHBoxLayout(); brow4.addWidget(self._back_gyro_name_btn); brow4.addStretch()
@@ -258,7 +291,7 @@ class SetupFlowScreen(QWidget):
         self._resolution_section = QWidget(); self._resolution_section.setVisible(False)
         rl = QVBoxLayout(self._resolution_section)
         rl.setContentsMargins(80, 60, 80, 60); rl.setSpacing(16)
-        self._back_res_btn = _btn("← Back", C_DARK_BTN, size=10, h=30)
+        self._back_res_btn = _btn("\u2190 Back", C_DARK_BTN, size=10, h=30)
         self._back_res_btn.setFixedWidth(80)
         self._back_res_btn.clicked.connect(self._back_to_name_from_res)
         brow_res = QHBoxLayout(); brow_res.addWidget(self._back_res_btn); brow_res.addStretch()
@@ -279,7 +312,7 @@ class SetupFlowScreen(QWidget):
         col_1610.addWidget(_lbl("16:10", 13, C_ACCENT1, bold=True))
         for res_key, label in [("1280x800", "1280 x 800"), ("1920x1200", "1920 x 1200")]:
             b = _btn(label, C_DARK_BTN, h=52)
-            b.clicked.connect(lambda checked, k=res_key: self._pick_resolution(k))
+            b.clicked.connect(lambda _, k=res_key: self._pick_resolution(k))
             col_1610.addWidget(b)
         res_cols.addLayout(col_1610)
 
@@ -287,7 +320,7 @@ class SetupFlowScreen(QWidget):
         col_169.addWidget(_lbl("16:9", 13, C_ACCENT1, bold=True))
         for res_key, label in [("1280x720", "1280 x 720"), ("1920x1080", "1920 x 1080")]:
             b = _btn(label, C_DARK_BTN, h=52)
-            b.clicked.connect(lambda checked, k=res_key: self._pick_resolution(k))
+            b.clicked.connect(lambda _, k=res_key: self._pick_resolution(k))
             col_169.addWidget(b)
         res_cols.addLayout(col_169)
 
@@ -295,7 +328,7 @@ class SetupFlowScreen(QWidget):
         rl.addSpacing(8)
         own_res = _btn("My Own", C_DARK_BTN, h=44)
         own_res.setFixedWidth(200)
-        own_res.clicked.connect(lambda: self._pick_resolution("own"))
+        own_res.clicked.connect(lambda _: self._pick_resolution("own"))
         own_row = QHBoxLayout(); own_row.addStretch(); own_row.addWidget(own_res); own_row.addStretch()
         rl.addLayout(own_row)
         rl.addSpacing(40)
