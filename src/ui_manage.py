@@ -83,6 +83,9 @@ class ManagementScreen(QWidget):
     """
     Post-install home. Shows 4 game cards in a 2x2 grid.
     Each card displays game name, setup status, and a Reinstall button.
+
+    Cards are rebuilt every time the screen is shown (via showEvent) so
+    status badges stay in sync after reinstalls or config changes.
     """
     def __init__(self, stack):
         super().__init__(); self.stack = stack; self.screen_name = "ManagementScreen"
@@ -91,25 +94,22 @@ class ManagementScreen(QWidget):
         lay = QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0); lay.setSpacing(0)
 
         content = QWidget()
-        clay = QVBoxLayout(content); clay.setContentsMargins(60, 40, 60, 40); clay.setSpacing(20)
+        self._clay = QVBoxLayout(content)
+        self._clay.setContentsMargins(60, 40, 60, 40)
+        self._clay.setSpacing(20)
 
-        _title_block(clay, main_size=36)
-        clay.addSpacing(8)
+        _title_block(self._clay, main_size=36)
+        self._clay.addSpacing(8)
 
-        clay.addWidget(_lbl("My Games", size=14, color=C_DIM, bold=False))
+        self._clay.addWidget(_lbl("My Games", size=14, color=C_DIM, bold=False))
 
-        # Game grid (2 cols x 2 rows)
-        grid = QGridLayout()
-        grid.setSpacing(16)
-        grid.setColumnStretch(0, 1)
-        grid.setColumnStretch(1, 1)
-
-        for i, game in enumerate(ALL_GAMES):
-            card = self._make_card(game)
-            row, col = divmod(i, 2)
-            grid.addWidget(card, row, col)
-
-        clay.addLayout(grid, stretch=1)
+        # Grid container - holds the game cards, rebuilt on every show
+        self._grid_container = QWidget()
+        self._grid_layout = QGridLayout(self._grid_container)
+        self._grid_layout.setSpacing(16)
+        self._grid_layout.setColumnStretch(0, 1)
+        self._grid_layout.setColumnStretch(1, 1)
+        self._clay.addWidget(self._grid_container, stretch=1)
 
         # Settings button at bottom
         settings_btn = _btn("Settings", C_DARK_BTN, size=13, h=48)
@@ -119,9 +119,32 @@ class ManagementScreen(QWidget):
         btn_lay.addStretch()
         btn_lay.addWidget(settings_btn)
         btn_lay.addStretch()
-        clay.addLayout(btn_lay)
+        self._clay.addLayout(btn_lay)
 
         lay.addWidget(content, stretch=1)
+
+        # Build cards for the first time
+        self._rebuild_cards()
+
+    def showEvent(self, e):
+        """Rebuild game cards every time the screen is shown so status
+        badges reflect current config (e.g. after a reinstall)."""
+        super().showEvent(e)
+        self._rebuild_cards()
+
+    def _rebuild_cards(self):
+        """Clear and recreate all game cards from current config state."""
+        # Remove existing cards from the grid
+        while self._grid_layout.count():
+            item = self._grid_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        # Build fresh cards
+        for i, game in enumerate(ALL_GAMES):
+            card = self._make_card(game)
+            row, col = divmod(i, 2)
+            self._grid_layout.addWidget(card, row, col)
 
     def _make_card(self, game):
         """Create a single game card widget."""
