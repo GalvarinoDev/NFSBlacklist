@@ -248,10 +248,16 @@ def _detached_open(args):
 # -- Title block ---------------------------------------------------------------
 
 def _title_block(lay, main_size=56):
-    t = QLabel("NFSBLACKLIST")
-    t.setFont(font(main_size, display=True))
+    t = QLabel()
+    t.setTextFormat(Qt.RichText)
     t.setAlignment(Qt.AlignCenter)
-    t.setStyleSheet("color:#FFFFFF; background:transparent;")
+    t.setStyleSheet("background:transparent;")
+    t.setText(
+        f'<span style="font-family:\'{_FONT_FAMILY_DISP}\'; font-size:{main_size}pt;">'
+        f'<span style="color:{C_ACCENT1};">NFS</span>'
+        f'<span style="color:#FFFFFF;">BLACKLIST</span>'
+        f'</span>'
+    )
     lay.addWidget(t)
     sub = QLabel()
     sub.setTextFormat(Qt.RichText)
@@ -278,6 +284,25 @@ def _title_block(lay, main_size=56):
         lay.addLayout(bw)
 
 
+def _wordmark(lay):
+    """Compact single-line wordmark for post-setup screens.
+
+    No subtitle, no build badge. Just the styled name at a readable size
+    so the screen's actual content gets the vertical space.
+    """
+    t = QLabel()
+    t.setTextFormat(Qt.RichText)
+    t.setAlignment(Qt.AlignLeft)
+    t.setStyleSheet("background:transparent;")
+    t.setText(
+        f'<span style="font-family:\'{_FONT_FAMILY_DISP}\'; font-size:20pt;">'
+        f'<span style="color:{C_ACCENT1};">NFS</span>'
+        f'<span style="color:#FFFFFF;">BLACKLIST</span>'
+        f'</span>'
+    )
+    lay.addWidget(t)
+
+
 # -- Shared signals ------------------------------------------------------------
 
 class _Sigs(QObject):
@@ -301,7 +326,7 @@ QScrollBar:vertical {{ background:#0d1520; width:8px; border-radius:4px; }}
 QScrollBar::handle:vertical {{ background:#2a3a52; border-radius:4px; min-height:30px; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height:0; }}
 QProgressBar {{ background:#111927; border-radius:7px; border:none; }}
-QProgressBar::chunk {{ background:{C_ACCENT2}; border-radius:7px; }}
+QProgressBar::chunk {{ background:{C_ACCENT1}; border-radius:7px; }}
 QCheckBox::indicator {{ width:22px; height:22px; border:2px solid #2a3a52; border-radius:4px; background:#111927; }}
 QCheckBox::indicator:checked {{ background:{C_ACCENT1}; border-color:{C_ACCENT1}; }}
 """
