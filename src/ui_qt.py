@@ -16,15 +16,16 @@ from PyQt5.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QWidget,
 )
 from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QIcon
 
 import bootstrap as _bootstrap
 import config as cfg
-from identity import APP_TITLE
+from identity import APP_TITLE, BUILD_BADGE
 
 from ui_constants import (
     C_DIM, font, _btn, _lbl, _title_block, _Sigs,
     _load_font, _app_style, _start_audio, _kill_audio,
-    go_to, get_screen,
+    go_to, get_screen, PROJECT_ROOT,
 )
 
 from ui_setup import SetupFlowScreen
@@ -87,6 +88,12 @@ class NFSBlacklistWindow(QMainWindow):
         self.setWindowTitle(APP_TITLE)
         self.resize(1280, 800)
         self.setMinimumSize(800, 500)
+
+        # Window icon
+        icon_path = os.path.join(PROJECT_ROOT, "assets", "images", "icon.png")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+
         self.stack = QStackedWidget()
         self.setCentralWidget(self.stack)
 
@@ -107,13 +114,14 @@ class NFSBlacklistWindow(QMainWindow):
 
         self.stack.setCurrentIndex(0)
 
-        # Debug label - shows current screen name and index in bottom-left
+        # Debug label - only shown for nightly builds
         self._dbg_label = QLabel(self)
         self._dbg_label.setStyleSheet(
             "color:#444455;background:transparent;padding:4px 8px;"
         )
         self._dbg_label.setFont(font(9))
         self._dbg_label.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self._dbg_label.setVisible(BUILD_BADGE is not None)
         self._dbg_label.raise_()
         self.stack.currentChanged.connect(self._update_dbg_label)
         self._update_dbg_label(0)

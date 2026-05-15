@@ -18,7 +18,7 @@ import config as cfg
 from identity import APP_TITLE, INSTALL_DIR, GITHUB_USER, GITHUB_REPO
 from ui_constants import (
     C_BG, C_CARD, C_ACCENT1, C_ACCENT2, C_DIM, C_DARK_BTN, C_RED_BTN,
-    font, _btn, _lbl, _title_block,
+    font, _btn, _lbl, _title_block, _wordmark,
     ALL_GAMES, LOG_PATH, HEROES_DIR,
     go_to, get_screen,
     _set_audio_volume, _set_audio_enabled,
@@ -112,7 +112,7 @@ class _HeroCard(QWidget):
             # No image - use standard card background
             self.setStyleSheet(
                 f"QWidget {{ background: {C_CARD}; border-radius: 8px; "
-                f"border: 0.5px solid rgba(255,255,255,0.08); }}"
+                f"border: 1px solid rgba(255,255,255,0.12); }}"
             )
 
     def paintEvent(self, event):
@@ -169,7 +169,7 @@ class ManagementScreen(QWidget):
         self._clay.setContentsMargins(60, 40, 60, 40)
         self._clay.setSpacing(20)
 
-        _title_block(self._clay, main_size=36)
+        _wordmark(self._clay)
         self._clay.addSpacing(8)
 
         self._clay.addWidget(_lbl("My Games", size=14, color=C_DIM, bold=False))
@@ -274,7 +274,7 @@ class ManagementScreen(QWidget):
             badge = QLabel("Installed")
             badge.setFont(font(11, bold=True))
             badge.setStyleSheet(
-                f"QLabel {{ color: {C_ACCENT1}; background: rgba(59,125,216,0.15); "
+                f"QLabel {{ color: {C_ACCENT1}; background: rgba(59,125,216,0.25); "
                 f"border-radius: 4px; padding: 3px 10px; }}"
             )
             clay.addWidget(badge)
@@ -328,7 +328,7 @@ class ConfigureScreen(QWidget):
         brow = QHBoxLayout(); brow.addWidget(back_btn); brow.addStretch()
         clay.addLayout(brow)
 
-        _title_block(clay, main_size=36)
+        _wordmark(clay)
         clay.addSpacing(8)
         clay.addWidget(_lbl("Settings", size=16, color=C_DIM))
         clay.addSpacing(16)
@@ -371,8 +371,8 @@ class ConfigureScreen(QWidget):
 
         sl.addWidget(_lbl("Setup", size=14, color="#FFF", bold=True, align=Qt.AlignLeft))
         sl.addWidget(_lbl(
-            "Re-run the first-time setup wizard to change your device, "
-            "OS, gyro, or player name.",
+            "Re-run the first-time setup wizard to change your device "
+            "or OS.",
             size=12, color=C_DIM, align=Qt.AlignLeft))
 
         rerun_btn = _btn("Re-run Setup", C_DARK_BTN, size=12, h=44)
@@ -423,7 +423,7 @@ class ConfigureScreen(QWidget):
         card = QWidget()
         card.setStyleSheet(
             f"QWidget {{ background: {C_CARD}; border-radius: 8px; "
-            f"border: 0.5px solid rgba(255,255,255,0.08); }}"
+            f"border: 1px solid rgba(255,255,255,0.12); }}"
         )
         return card
 
@@ -499,10 +499,8 @@ class AboutScreen(QWidget):
         brow = QHBoxLayout(); brow.addWidget(back_btn); brow.addStretch()
         clay.addLayout(brow)
 
-        _title_block(clay, main_size=36)
+        _wordmark(clay)
         clay.addSpacing(16)
-
-        # Build info - read from BUILD file
         build_info = self._read_build_file()
         clay.addWidget(_lbl(f"Build: {build_info}", size=13, color=C_DIM))
 
@@ -512,7 +510,7 @@ class AboutScreen(QWidget):
         info_card = QWidget()
         info_card.setStyleSheet(
             f"QWidget {{ background: {C_CARD}; border-radius: 8px; "
-            f"border: 0.5px solid rgba(255,255,255,0.08); }}"
+            f"border: 1px solid rgba(255,255,255,0.12); }}"
         )
         il = QVBoxLayout(info_card); il.setContentsMargins(24, 20, 24, 20); il.setSpacing(12)
 
@@ -538,7 +536,7 @@ class AboutScreen(QWidget):
         device_card = QWidget()
         device_card.setStyleSheet(
             f"QWidget {{ background: {C_CARD}; border-radius: 8px; "
-            f"border: 0.5px solid rgba(255,255,255,0.08); }}"
+            f"border: 1px solid rgba(255,255,255,0.12); }}"
         )
         dcl = QVBoxLayout(device_card); dcl.setContentsMargins(24, 20, 24, 20); dcl.setSpacing(8)
         dcl.addWidget(_lbl("Current Config", size=13, color="#FFF", bold=True, align=Qt.AlignLeft))
@@ -562,12 +560,6 @@ class AboutScreen(QWidget):
         other = c.get("other_device")
         if other:
             lines.append(f"Resolution: {other}")
-        gyro = c.get("gyro_mode")
-        if gyro:
-            lines.append(f"Gyro: {gyro}")
-        player = c.get("player_name")
-        if player:
-            lines.append(f"Player: {player}")
         ge = c.get("ge_proton_version")
         if ge:
             lines.append(f"GE-Proton: {ge}")
@@ -610,7 +602,7 @@ class LogViewerScreen(QWidget):
         brow = QHBoxLayout(); brow.addWidget(back_btn); brow.addStretch()
         clay.addLayout(brow)
 
-        _title_block(clay, main_size=36)
+        _wordmark(clay)
         clay.addSpacing(8)
         clay.addWidget(_lbl("Install Log", size=14, color=C_DIM))
 
@@ -620,7 +612,7 @@ class LogViewerScreen(QWidget):
         self._log_view.setFont(font(10))
         self._log_view.setStyleSheet(
             f"QPlainTextEdit{{color:{C_ACCENT2};background:{C_CARD};"
-            f"border:1px solid rgba(255,255,255,0.08);border-radius:8px;"
+            f"border:1px solid rgba(255,255,255,0.12);border-radius:8px;"
             f"padding:12px;}}"
         )
         clay.addWidget(self._log_view, stretch=1)
@@ -654,7 +646,7 @@ class UpdateScreen(QWidget):
         super().__init__(); self.stack = stack; self.screen_name = "UpdateScreen"
         lay = QVBoxLayout(self); lay.setContentsMargins(80, 80, 80, 80); lay.setSpacing(20)
 
-        _title_block(lay, main_size=36)
+        _wordmark(lay)
         lay.addSpacing(20)
 
         msg = _lbl("You are up to date.", size=16, color=C_DIM)
