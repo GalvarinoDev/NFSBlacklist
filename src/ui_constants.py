@@ -128,7 +128,7 @@ BTN_RATIO  = 0.20
 CARD_COLS  = 4
 CARD_MAX_W = 220
 
-MUSIC_URL = "https://ia601403.us.archive.org/31/items/background_20260515/background.mp3"
+MUSIC_URL = "https://dn710406.ca.archive.org/0/items/background_20260515/background.mp3"
 
 
 # -- Audio ---------------------------------------------------------------------

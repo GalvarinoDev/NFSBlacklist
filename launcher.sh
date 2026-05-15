@@ -1,5 +1,5 @@
 #!/bin/bash
-# launcher.sh — NFSBlacklist entry point
+# launcher.sh -- NFSBlacklist entry point
 
 # Source nfsblacklist_identity.sh if available, otherwise fallback
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -21,7 +21,7 @@ LOCKFILE="$HOME/.nfsblacklist_installing"
 VERSION_FILE="$INSTALL_DIR/VERSION"
 UPDATE_DIR="$INSTALL_DIR/.update"
 
-# ── Installing or first-time — run install directly ───────────────────────────
+# -- Installing or first-time -- run install directly --------------------------
 if [ ! -d "$INSTALL_DIR" ] || [ -f "$LOCKFILE" ]; then
     touch "$LOCKFILE"
     curl -sL "$GITHUB_RAW/install.sh" | bash
@@ -29,7 +29,7 @@ if [ ! -d "$INSTALL_DIR" ] || [ -f "$LOCKFILE" ]; then
     exit 0
 fi
 
-# ── Update check ──────────────────────────────────────────────────────────────
+# -- Update check --------------------------------------------------------------
 check_for_updates() {
     local LOCAL_SHA REMOTE_SHA CHANGED_FILES FILE_COUNT
     local FORCE="${1:-}"
@@ -69,7 +69,7 @@ check_for_updates() {
         [ $? -ne 0 ] && return 0
     fi
 
-    # ── Download changed files to staging dir ─────────────────────────────
+    # -- Download changed files to staging dir ---------------------------------
     rm -rf "$UPDATE_DIR"
     mkdir -p "$UPDATE_DIR"
 
@@ -106,6 +106,7 @@ check_for_updates() {
         while IFS= read -r filepath; do
             case "$filepath" in
                 logs/*) continue ;;
+                assets/music/background.mp3) continue ;;
             esac
 
             local DEST_DIR
@@ -131,12 +132,18 @@ check_for_updates() {
         return 0
     fi
 
-    # ── Apply staged files ────────────────────────────────────────────────
+    # -- Apply staged files ----------------------------------------------------
     if [ "$LOCAL_SHA" = "0" ] || [ -z "$CHANGED_FILES" ]; then
-        # Full update — preserve user config
+        # Full update -- preserve user config and downloaded music
         local SAVED_CONFIG=""
         if [ -f "$INSTALL_DIR/nfsblacklist.json" ]; then
             SAVED_CONFIG="$(cat "$INSTALL_DIR/nfsblacklist.json")"
+        fi
+
+        local SAVED_MUSIC=""
+        if [ -f "$INSTALL_DIR/assets/music/background.mp3" ]; then
+            SAVED_MUSIC="$INSTALL_DIR/assets/music/background.mp3.bak"
+            cp "$INSTALL_DIR/assets/music/background.mp3" "$SAVED_MUSIC"
         fi
 
         cp -r "$UPDATE_DIR"/. "$INSTALL_DIR"/
@@ -144,10 +151,15 @@ check_for_updates() {
         if [ -n "$SAVED_CONFIG" ]; then
             echo "$SAVED_CONFIG" > "$INSTALL_DIR/nfsblacklist.json"
         fi
+
+        if [ -n "$SAVED_MUSIC" ] && [ -f "$SAVED_MUSIC" ]; then
+            mv "$SAVED_MUSIC" "$INSTALL_DIR/assets/music/background.mp3"
+        fi
     else
         while IFS= read -r filepath; do
             case "$filepath" in
                 logs/*) continue ;;
+                assets/music/background.mp3) continue ;;
             esac
 
             if [ -f "$UPDATE_DIR/$filepath" ]; then
@@ -173,7 +185,7 @@ check_for_updates() {
     return 0
 }
 
-# ── Already installed — ask what to do ───────────────────────────────────────
+# -- Already installed -- ask what to do ---------------------------------------
 choice=$(zenity \
     --list \
     --title="$APP_TITLE" \
