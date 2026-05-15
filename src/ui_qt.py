@@ -6,7 +6,7 @@ All screen classes are imported from split modules:
     ui_constants  - shared constants, helpers, navigation
     ui_setup      - first-run setup flow (OS -> Device -> Gyro -> ...)
     ui_install    - install pipeline (OwnScan, OwnInstall)
-    ui_manage     - post-install (Management, Configure, Update)
+    ui_manage     - post-install (Management, Configure, About, LogViewer, Update)
 """
 
 import sys, os, threading
@@ -29,7 +29,10 @@ from ui_constants import (
 
 from ui_setup import SetupFlowScreen
 from ui_install import OwnScanScreen, OwnInstallScreen
-from ui_manage import ManagementScreen, ConfigureScreen, SetupCompleteScreen, UpdateScreen
+from ui_manage import (
+    ManagementScreen, ConfigureScreen, SetupCompleteScreen,
+    AboutScreen, LogViewerScreen, UpdateScreen,
+)
 
 
 # -- BootstrapScreen -----------------------------------------------------------
@@ -96,6 +99,8 @@ class NFSBlacklistWindow(QMainWindow):
             ManagementScreen,
             ConfigureScreen,
             SetupCompleteScreen,
+            AboutScreen,
+            LogViewerScreen,
             UpdateScreen,
         ]:
             self.stack.addWidget(cls(self.stack))
