@@ -74,7 +74,7 @@ HERO_IMAGES = {
 # Same URL used in ui_constants.py. Defined here too so bootstrap doesn't
 # need to import from ui_constants (which requires PyQt5 to be loaded).
 
-MUSIC_URL = "https://archive.org/download/adrenaline-klickaud/Adrenaline_KLICKAUD.mp3"
+MUSIC_URL = "https://ia601403.us.archive.org/31/items/background_20260515/background.mp3"
 
 
 # -- Public API ----------------------------------------------------------------
