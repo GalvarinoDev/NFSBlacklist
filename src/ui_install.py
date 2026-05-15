@@ -6,12 +6,13 @@ No Steam pipeline screens (WelcomeScreen, SetupScreen, InstallScreen)
 since these games were never on Steam.
 """
 
+import html as _html
 import os, subprocess, threading
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
     QLabel, QPushButton, QCheckBox, QProgressBar,
-    QPlainTextEdit, QFileDialog, QMessageBox,
+    QTextEdit, QFileDialog, QMessageBox,
 )
 from PyQt5.QtCore import Qt, QTimer
 
@@ -244,7 +245,7 @@ class OwnInstallScreen(QWidget):
         _title_block(clay, main_size=36)
         clay.addSpacing(8)
 
-        self.cur = _lbl("Preparing install...", 14, C_DIM)
+        self.cur = _lbl("Preparing install...", 14, "#FFF")
         clay.addWidget(self.cur)
 
         self.bar = QProgressBar(); self.bar.setMaximum(100); self.bar.setTextVisible(False)
@@ -252,10 +253,10 @@ class OwnInstallScreen(QWidget):
         bw = QHBoxLayout(); bw.addStretch(); bw.addWidget(self.bar, 6); bw.addStretch()
         clay.addLayout(bw)
 
-        self.log = QPlainTextEdit(); self.log.setReadOnly(True)
+        self.log = QTextEdit(); self.log.setReadOnly(True)
         self.log.setFont(font(11))
         self.log.setStyleSheet(
-            "QPlainTextEdit{color:#666677;background:transparent;border:none;padding:10px;}")
+            f"QTextEdit{{color:{C_DIM};background:transparent;border:none;padding:10px;}}")
         clay.addWidget(self.log, stretch=1)
 
         self.cont_btn = _btn("Continue  >>", C_ACCENT1, size=13, h=52)
@@ -291,8 +292,29 @@ class OwnInstallScreen(QWidget):
     def _stop_pulse(self):
         self._pulse_timer.stop()
 
+    # -- Log line colours ---------------------------------------------------------
+    # Section headers (-- ... --) get accent blue, success (ok) gets green,
+    # errors (!!) get soft red. Everything else uses the default dim colour.
+    _LOG_CLR_OK      = "#4CAF50"   # green
+    _LOG_CLR_ERR     = "#E57373"   # soft red
+    _LOG_CLR_SECTION = C_ACCENT1   # BMW racing blue
+
     def _append_log(self, text):
-        self.log.appendPlainText(text)
+        stripped = text.strip()
+        if stripped.startswith("--") and stripped.endswith("--"):
+            color = self._LOG_CLR_SECTION
+        elif "  ok  " in text or text.lstrip().startswith("ok "):
+            color = self._LOG_CLR_OK
+        elif "  !!  " in text:
+            color = self._LOG_CLR_ERR
+        else:
+            color = None  # use stylesheet default
+
+        escaped = _html.escape(text)
+        if color:
+            self.log.append(f'<span style="color:{color}">{escaped}</span>')
+        else:
+            self.log.append(escaped)
         self.log.verticalScrollBar().setValue(self.log.verticalScrollBar().maximum())
         _log_to_file(text)
 
