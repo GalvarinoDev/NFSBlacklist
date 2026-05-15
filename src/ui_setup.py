@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (
     QLabel, QPushButton, QLineEdit,
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QImage, QColor
 
 import config as cfg
 
@@ -30,6 +30,64 @@ from ui_constants import (
 # -- Paths --------------------------------------------------------------------
 
 M3_IMAGE_PATH = os.path.join(PROJECT_ROOT, "assets", "images", "m3.png")
+
+
+# -- Background removal -------------------------------------------------------
+
+def _remove_grey_bg(path: str, threshold: int = 30) -> QPixmap:
+    """
+    Load an image and make near-grey/near-white background pixels transparent.
+
+    Works by sampling the four corners to determine the background colour,
+    then flood-filling outward from each corner replacing pixels within
+    `threshold` distance (per channel) of that colour with transparency.
+    Returns a QPixmap with an alpha channel, or None if the file can't be read.
+    """
+    img = QImage(path)
+    if img.isNull():
+        return None
+
+    img = img.convertToFormat(QImage.Format_ARGB32)
+    w, h = img.width(), img.height()
+
+    # Sample corners to get background colour - average them
+    corners = [
+        img.pixelColor(0, 0),
+        img.pixelColor(w - 1, 0),
+        img.pixelColor(0, h - 1),
+        img.pixelColor(w - 1, h - 1),
+    ]
+    bg_r = sum(c.red()   for c in corners) // 4
+    bg_g = sum(c.green() for c in corners) // 4
+    bg_b = sum(c.blue()  for c in corners) // 4
+
+    def _is_bg(color):
+        return (
+            abs(color.red()   - bg_r) <= threshold and
+            abs(color.green() - bg_g) <= threshold and
+            abs(color.blue()  - bg_b) <= threshold
+        )
+
+    transparent = QColor(0, 0, 0, 0)
+
+    # BFS flood fill from all four corners simultaneously
+    visited = set()
+    queue = [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]
+    for pos in queue:
+        visited.add(pos)
+
+    while queue:
+        next_queue = []
+        for x, y in queue:
+            if _is_bg(img.pixelColor(x, y)):
+                img.setPixelColor(x, y, transparent)
+                for nx, ny in ((x-1,y),(x+1,y),(x,y-1),(x,y+1)):
+                    if 0 <= nx < w and 0 <= ny < h and (nx, ny) not in visited:
+                        visited.add((nx, ny))
+                        next_queue.append((nx, ny))
+        queue = next_queue
+
+    return QPixmap.fromImage(img)
 
 
 # -- Device definitions --------------------------------------------------------
@@ -123,8 +181,8 @@ class SetupFlowScreen(QWidget):
         self._m3_label.setAlignment(Qt.AlignCenter)
         self._m3_label.setStyleSheet("background: transparent;")
         if os.path.exists(M3_IMAGE_PATH):
-            px = QPixmap(M3_IMAGE_PATH)
-            if not px.isNull():
+            px = _remove_grey_bg(M3_IMAGE_PATH)
+            if px and not px.isNull():
                 # Scale to reasonable size, keep aspect ratio
                 scaled = px.scaledToWidth(420, Qt.SmoothTransformation)
                 self._m3_label.setPixmap(scaled)
