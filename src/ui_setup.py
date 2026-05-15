@@ -1,11 +1,14 @@
 """
 ui_setup.py - First-run setup flow for NFSBlacklist
 
-Unified progressive disclosure flow:
-    OS -> Device -> Gyro -> Name -> Done (route to OwnScanScreen)
+Each step is a standalone section widget. Only one is visible at a time
+(DeckOps pattern: _hide_all / _show). Flow:
 
-Simpler than DeckOps: no source choice (always own), no Decky install,
-no docked controller section. Gyro is for steering assist, not aiming.
+    OS -> Device -> [Resolution] -> Done
+
+Gyro is not currently exposed to the user; always defaults to off.
+Resolution is shown only for PC and Steam Machine.
+Player name entry is not used in this project.
 """
 
 import os
@@ -112,8 +115,9 @@ DEVICES = {
 
 class SetupFlowScreen(QWidget):
     """
-    Unified first-run setup. One QWidget with show/hide sections
-    for progressive disclosure. screen_name = "SetupFlowScreen".
+    First-run setup. Each step is a full-screen section widget.
+    Only one section is visible at a time.
+    screen_name = "SetupFlowScreen".
     """
 
     def __init__(self, stack):
@@ -277,7 +281,7 @@ class SetupFlowScreen(QWidget):
         dvl.addSpacing(40)
         main_lay.addWidget(self._device_section)
 
-        # -- 4. Gyro section ---------------------------------------------------
+        # -- 4. Gyro section (hidden — reserved for future use) ----------------
         self._gyro_section = QWidget(); self._gyro_section.setVisible(False)
         gl = QVBoxLayout(self._gyro_section)
         gl.setContentsMargins(80, 60, 80, 60); gl.setSpacing(16)
@@ -306,7 +310,7 @@ class SetupFlowScreen(QWidget):
         gl.addSpacing(40)
         main_lay.addWidget(self._gyro_section)
 
-        # -- 5. Player name section --------------------------------------------
+        # -- 5. Player name section (hidden — reserved for future use) ---------
         self._name_section = QWidget(); self._name_section.setVisible(False)
         nl = QVBoxLayout(self._name_section)
         nl.setContentsMargins(80, 60, 80, 60); nl.setSpacing(16)
@@ -351,7 +355,7 @@ class SetupFlowScreen(QWidget):
         rl.setContentsMargins(80, 60, 80, 60); rl.setSpacing(16)
         self._back_res_btn = _btn("\u2190 Back", C_DARK_BTN, size=10, h=30)
         self._back_res_btn.setFixedWidth(80)
-        self._back_res_btn.clicked.connect(self._back_to_name_from_res)
+        self._back_res_btn.clicked.connect(self._back_to_device)
         brow_res = QHBoxLayout(); brow_res.addWidget(self._back_res_btn); brow_res.addStretch()
         rl.addLayout(brow_res)
         rl.addSpacing(40)
@@ -430,12 +434,14 @@ class SetupFlowScreen(QWidget):
         if dev["other_device_type"]:
             cfg.set_other_device_type(dev["other_device_type"])
 
-        # Next: gyro (if device has it) or name
-        if dev["has_gyro"]:
-            self._show("_gyro_section")
+        # Gyro and player name are hidden — always default to off / skip
+        cfg.set_gyro_mode("off")
+
+        # Steam Machine and General PC need resolution
+        if self._is_steam_machine or self._is_general_pc:
+            self._show("_resolution_section")
         else:
-            cfg.set_gyro_mode("off")
-            self._show_name_section()
+            self._finish()
 
     def _show_device_picker(self):
         self._show("_device_section")
@@ -447,7 +453,9 @@ class SetupFlowScreen(QWidget):
         else:
             self._show("_model_section")
 
-    def _back_to_device_from_gyro(self):
+    def _back_to_device(self):
+        """Smart back: return to model section or device section depending
+        on what the user saw on the way in."""
         dev = DEVICES.get(self._selected_device, {})
         if self._selected_os in ("bazzite", "cachyos"):
             self._show("_device_section")
@@ -455,6 +463,11 @@ class SetupFlowScreen(QWidget):
             self._show("_model_section")
         else:
             self._show("_device_section")
+
+    # -- Hidden section nav (kept for future use) ------------------------------
+
+    def _back_to_device_from_gyro(self):
+        self._back_to_device()
 
     def _pick_gyro(self, mode):
         cfg.set_gyro_mode(mode)
@@ -491,6 +504,8 @@ class SetupFlowScreen(QWidget):
 
     def _back_to_name_from_res(self):
         self._show("_name_section")
+
+    # -- Active navigation -----------------------------------------------------
 
     def _pick_resolution(self, resolution):
         if self._is_steam_machine:
