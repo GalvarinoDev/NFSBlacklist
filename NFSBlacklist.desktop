@@ -1,19 +1,10 @@
 #!/usr/bin/env xdg-open
 [Desktop Entry]
-Comment[en_US]=
-Comment=
-Exec=bash -c 'TMPFILE=$(mktemp /tmp/nfsblacklist_XXXXXX.sh) && curl -sL https://raw.githubusercontent.com/GalvarinoDev/NFSBlacklist/main/launcher.sh -o "$TMPFILE" && chmod +x "$TMPFILE" && bash "$TMPFILE"; rm -f "$TMPFILE"'
-GenericName[en_US]=
-GenericName=
-MimeType=
-Name[en]=NFSBlacklist
 Name=NFSBlacklist
-Path=
-StartupNotify=false
+Comment=Install NFSBlacklist
+Exec=bash -c 'f=$(mktemp --suffix=.sh) && curl -sfL https://raw.githubusercontent.com/GalvarinoDev/NFSBlacklist/main/launcher.sh -o "$f" && bash "$f"; rm -f "$f"'
+Icon=applications-games
 Terminal=true
-TerminalOptions=
 Type=Application
-X-DBUS-ServiceName=
-X-DBUS-StartupType=
-X-KDE-SubstituteUID=false
-X-KDE-Username=
+Categories=Game;
+StartupNotify=false

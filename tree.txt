@@ -1,36 +1,32 @@
 .
 ├── assets
+│   ├── controllers/          (24 Steam Input templates)
+│   ├── fonts
+│   │   └── Orbitron-VariableFont_wght.ttf
 │   └── images
 │       ├── icon.png
+│       ├── m3.png
 │       └── setup.png
+├── src
+│   ├── engine/               (synced copy of Modding-Engine, do not edit)
+│   ├── installers
+│   │   ├── __init__.py
+│   │   └── nfs.py
+│   ├── games.py
+│   ├── identity.py
+│   └── main.py
+├── tools
+│   └── check.py
+├── CLAUDE.md
+├── common.sh
+├── ENGINE_VERSION
 ├── install.sh
 ├── launcher.sh
 ├── LICENSE
 ├── NFSBlacklist.desktop
-├── nfsblacklist_identity.sh
-├── nfsblacklist_uninstall.sh
+├── prelaunch.sh
+├── project.env
 ├── README.md
 ├── requirements.txt
-├── src
-│   ├── bootstrap.py
-│   ├── config.py
-│   ├── detect_games.py
-│   ├── extra_options.py
-│   ├── ge_proton.py
-│   ├── identity.py
-│   ├── ini_utils.py
-│   ├── log.py
-│   ├── main.py
-│   ├── net.py
-│   ├── shortcut.py
-│   ├── ui_constants.py
-│   ├── ui_install.py
-│   ├── ui_qt.py
-│   ├── ui_setup.py
-│   ├── widescreen_fix.py
-│   ├── wrapper.py
-│   ├── xenon_effects.py
-│   └── xtended_input.py
-└── tree.txt
-
-4 directories, 30 files
+├── tree.txt
+└── uninstall.sh

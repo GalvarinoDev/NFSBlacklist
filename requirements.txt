@@ -1,4 +1,3 @@
-PyQt5>=5.15
-pygame>=2.5
-vdf>=3.4
-evdev-binary>=1.6.0
+# Extra pip packages the app needs (installed by install.sh into the venv).
+# PyQt6/PyQt5 are handled by install.sh itself; do not list them here.
+# xxhash   # only if a manifest uses xxh64 hashes

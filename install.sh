@@ -1,175 +1,110 @@
 #!/bin/bash
-# NFSBlacklist Installer
+# install.sh - first install. Runs curl-piped from launcher.sh, so it must
+# not depend on any other file until the repo is extracted.
+#
+# Steps: check tools, download the repo zip (not git clone: no git needed),
+# extract, Python venv with PyQt6 (PyQt5 if PyQt6 cannot open a window here),
+# extra requirements, desktop entries, record the installed commit, start
+# the app detached.
 
-# ── colours ───────────────────────────────────────────────────────────────────
-RED='\033[0;31m'
-YELLOW='\033[0;33m'
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-CLEAR='\033[0m'
+# Written by tools/new_project.py; must match project.env
+GITHUB_USER="${GITHUB_USER:-GalvarinoDev}"
+GITHUB_REPO="${GITHUB_REPO:-NFSBlacklist}"
+GITHUB_BRANCH="${GITHUB_BRANCH:-main}"
+INSTALL_DIR_NAME="${INSTALL_DIR_NAME:-NFSBlacklist}"
+APP_TITLE="${APP_TITLE:-NFSBlacklist}"
 
-info()    { printf "${CYAN}${BOLD}[NFSBL ]${CLEAR} %s\n" "$1"; }
-success() { printf "${GREEN}${BOLD}[  OK  ]${CLEAR} %s\n" "$1"; }
-warn()    { printf "${YELLOW}${BOLD}[ WARN ]${CLEAR} %s\n" "$1"; }
-die()     {
-    printf "${RED}${BOLD}[ERROR ]${CLEAR} %s\n" "$1"
-    echo ""
-    read -r -p "  Press Enter to close..."
-    exit 1
-}
+INSTALL_DIR="$HOME/$INSTALL_DIR_NAME"
+B='\033[1m'; C='\033[0;36m'; G='\033[0;32m'; Y='\033[0;33m'; R='\033[0;31m'; X='\033[0m'
+info() { printf "${C}${B}[%s]${X} %s\n" "$APP_TITLE" "$1"; }
+ok()   { printf "${G}${B}[  OK  ]${X} %s\n" "$1"; }
+warn() { printf "${Y}${B}[ WARN ]${X} %s\n" "$1"; }
+die()  { printf "${R}${B}[ERROR ]${X} %s\n" "$1"; echo; read -r -p "  Press Enter to close..."; exit 1; }
 
-# ── config ────────────────────────────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-if [ -f "$SCRIPT_DIR/nfsblacklist_identity.sh" ]; then
-    source "$SCRIPT_DIR/nfsblacklist_identity.sh"
-elif [ -f "$HOME/NFSBlacklist/nfsblacklist_identity.sh" ]; then
-    source "$HOME/NFSBlacklist/nfsblacklist_identity.sh"
-else
-    GITHUB_USER="GalvarinoDev"
-    GITHUB_REPO="NFSBlacklist"
-    INSTALL_DIR="$HOME/NFSBlacklist"
-    VENV_DIR="$INSTALL_DIR/.venv"
-    VENV_PYTHON="$VENV_DIR/bin/python3"
-    ENTRY_POINT="$INSTALL_DIR/src/main.py"
-    ICON_PATH="$INSTALL_DIR/assets/images/icon.png"
-    APP_TITLE="NFSBlacklist"
-    DESKTOP_COMMENT="NFSBlacklist — NFS Black Box games on SteamOS"
-    BUILD_FALLBACK="dev"
-    DESKTOP_FILE="$HOME/.local/share/applications/nfsblacklist.desktop"
-    DESKTOP_SHORTCUT="$HOME/Desktop/NFSBlacklist.desktop"
-fi
+echo; echo -e "  ${B}$APP_TITLE${X} - installer"; echo
 
-# ── header ────────────────────────────────────────────────────────────────────
-echo ""
-echo -e "${BOLD}  ███╗   ██╗███████╗███████╗    ██████╗ ██╗     ${CLEAR}"
-echo -e "${BOLD}  ████╗  ██║██╔════╝██╔════╝    ██╔══██╗██║     ${CLEAR}"
-echo -e "${BOLD}  ██╔██╗ ██║█████╗  ███████╗    ██████╔╝██║     ${CLEAR}"
-echo -e "${BOLD}  ██║╚██╗██║██╔══╝  ╚════██║    ██╔══██╗██║     ${CLEAR}"
-echo -e "${BOLD}  ██║ ╚████║██║     ███████║    ██████╔╝███████╗${CLEAR}"
-echo -e "${BOLD}  ╚═╝  ╚═══╝╚═╝     ╚══════╝    ╚═════╝ ╚══════╝${CLEAR}"
-echo ""
-echo -e "  ${YELLOW}${APP_TITLE:-NFSBlacklist} — Installer${CLEAR}"
-echo ""
+info "Checking tools..."
+for t in python3 curl unzip; do command -v "$t" >/dev/null || die "$t is not installed."; done
+python3 -c 'import sys; sys.exit(sys.version_info < (3, 10))' || die "Python 3.10 or newer is needed."
+python3 -c 'import venv, ensurepip' 2>/dev/null || warn "python venv/ensurepip missing; venv creation may fail."
+ok "Tools found."
 
-# ── step 1: check core dependencies ──────────────────────────────────────────
-info "Checking dependencies..."
-
-command -v python3 &>/dev/null || die "Python 3 is not installed."
-command -v curl    &>/dev/null || die "curl is not installed."
-command -v unzip   &>/dev/null || die "unzip is not installed."
-
-PYTHON_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-success "Python $PYTHON_VER found."
-
-# ── step 2: download latest release ──────────────────────────────────────────
-info "Downloading NFSBlacklist..."
-
-TMPZIP="$(mktemp /tmp/nfsblacklist_XXXXXX.zip)"
-curl -L --progress-bar "https://github.com/$GITHUB_USER/$GITHUB_REPO/archive/refs/heads/main.zip" -o "$TMPZIP" \
+info "Downloading..."
+TMPZIP="$(mktemp --suffix=.zip)"
+curl -fL --progress-bar "https://github.com/$GITHUB_USER/$GITHUB_REPO/archive/refs/heads/$GITHUB_BRANCH.zip" -o "$TMPZIP" \
     || die "Download failed. Check your internet connection."
-success "Download complete."
 
-# ── step 3: extract ───────────────────────────────────────────────────────────
 info "Installing to $INSTALL_DIR..."
-
-TMPDIR_EXTRACT="$(mktemp -d /tmp/nfsblacklist_extract_XXXXXX)"
-unzip -qq "$TMPZIP" -d "$TMPDIR_EXTRACT" || die "Failed to extract archive."
-rm "$TMPZIP"
-
-EXTRACTED=$(find "$TMPDIR_EXTRACT" -maxdepth 1 -mindepth 1 -type d | head -1)
-[ -z "$EXTRACTED" ] && EXTRACTED="$TMPDIR_EXTRACT"
-
+TMPX="$(mktemp -d)"
+unzip -qq "$TMPZIP" -d "$TMPX" || die "Could not extract the download."
+rm -f "$TMPZIP"
+SRC="$(find "$TMPX" -mindepth 1 -maxdepth 1 -type d | head -1)"
 mkdir -p "$INSTALL_DIR"
-cp -r "$EXTRACTED"/. "$INSTALL_DIR"/
-rm -rf "$TMPDIR_EXTRACT"
+# Over the top of an earlier install: the repo has no config.json or logs, so those stay
+cp -r "$SRC"/. "$INSTALL_DIR"/
+rm -rf "$TMPX"
+ok "Files installed."
 
-chmod +x "$ENTRY_POINT" 2>/dev/null || true
-success "NFSBlacklist installed to $INSTALL_DIR"
+# shellcheck disable=SC1091
+source "$INSTALL_DIR/common.sh" || die "common.sh missing from the download."
 
-# ── step 3b: write build info ────────────────────────────────────────────────
-BUILD_DATE=$(date '+%b %d, %Y')
-BUILD_HASH="${BUILD_FALLBACK:-dev}"
-if command -v git &>/dev/null && [ -d "$INSTALL_DIR/.git" ]; then
-    BUILD_HASH=$(cd "$INSTALL_DIR" && git rev-parse --short HEAD 2>/dev/null || echo "${BUILD_FALLBACK:-dev}")
+if [ -n "$MUSIC_URL" ] && [ ! -f "$INSTALL_DIR/assets/music/background.mp3" ]; then
+    mkdir -p "$INSTALL_DIR/assets/music"
+    curl -sSfL "$MUSIC_URL" -o "$INSTALL_DIR/assets/music/background.mp3" || warn "Background music not downloaded."
 fi
-echo "$BUILD_HASH ($BUILD_DATE)" > "$INSTALL_DIR/BUILD"
-success "Build info written: $BUILD_HASH ($BUILD_DATE)"
 
-# ── step 4: set up Python venv + install packages ────────────────────────────
-info "Setting up Python environment..."
-
-if [ ! -d "$VENV_DIR" ]; then
-    python3 -m venv "$VENV_DIR" || die "Failed to create Python virtual environment."
-    success "Virtual environment created."
+info "Setting up Python..."
+[ -d "$VENV_DIR" ] || python3 -m venv "$VENV_DIR" || die "Could not create the Python environment."
+PIP="$VENV_DIR/bin/pip"
+QT_OK=0
+if "$VENV_PYTHON" -c "from PyQt6.QtWidgets import QApplication" &>/dev/null; then
+    QT_OK=1
 else
-    success "Virtual environment already exists."
+    info "Installing PyQt6 (about a minute)..."
+    if "$PIP" install -q --disable-pip-version-check PyQt6; then
+        # A wheel that installs but cannot load its platform plugin would crash the app
+        if ("$VENV_PYTHON" -c "from PyQt6.QtWidgets import QApplication; QApplication([])") &>/dev/null; then
+            QT_OK=1
+        else
+            "$PIP" uninstall -y -q PyQt6 PyQt6-Qt6 PyQt6-sip &>/dev/null
+            touch "$VENV_DIR/.qt6_unsupported"
+            warn "PyQt6 cannot open a window here; using PyQt5."
+        fi
+    else
+        warn "PyQt6 install failed; using PyQt5."
+    fi
 fi
-
-if ! "$VENV_PYTHON" -c "from PyQt5.QtWidgets import QApplication" &>/dev/null 2>&1; then
-    info "Installing PyQt5 (this will take about 30 seconds)..."
-    "$VENV_DIR/bin/pip" install --quiet PyQt5 \
-        || die "Failed to install PyQt5. Check your internet connection and try again."
-    success "PyQt5 installed."
-else
-    PYQT5_VER=$("$VENV_PYTHON" -c "from PyQt5.QtCore import QT_VERSION_STR; print(QT_VERSION_STR)")
-    success "PyQt5 (Qt $PYQT5_VER) already installed."
+if [ "$QT_OK" = 0 ] && ! "$VENV_PYTHON" -c "from PyQt5.QtWidgets import QApplication" &>/dev/null; then
+    "$PIP" install -q --disable-pip-version-check PyQt5 || die "Could not install PyQt6 or PyQt5."
 fi
+[ -f "$INSTALL_DIR/requirements.txt" ] && "$PIP" install -q --disable-pip-version-check -r "$INSTALL_DIR/requirements.txt" \
+    || true
+ok "Python ready."
 
-if ! "$VENV_PYTHON" -c "import evdev" &>/dev/null 2>&1; then
-    info "Installing evdev-binary..."
-    "$VENV_DIR/bin/pip" install --quiet evdev-binary \
-        || warn "Failed to install evdev-binary — gamepad detection will not work."
-    success "evdev-binary installed."
-else
-    success "evdev already installed."
-fi
-
-# ── step 5: .desktop entry ───────────────────────────────────────────────────
-info "Creating application shortcut..."
-
+info "Creating shortcuts..."
 mkdir -p "$(dirname "$DESKTOP_FILE")"
-
-cat > "$DESKTOP_FILE" << DEOF
+cat > "$DESKTOP_FILE" <<DEOF
 [Desktop Entry]
-Name=${APP_TITLE:-NFSBlacklist}
-Comment=${DESKTOP_COMMENT:-NFSBlacklist — NFS Black Box games on SteamOS}
-Exec=$VENV_PYTHON $ENTRY_POINT
+Name=$APP_TITLE
+Comment=$APP_COMMENT
+Exec=bash "$INSTALL_DIR/launcher.sh"
 Icon=$ICON_PATH
 Terminal=false
 Type=Application
-Categories=Game;
+Categories=Game;Utility;
 StartupNotify=true
 DEOF
-
 chmod +x "$DESKTOP_FILE"
-success "App launcher shortcut created."
+if [ -d "$HOME/Desktop" ]; then cp "$DESKTOP_FILE" "$DESKTOP_SHORTCUT"; chmod +x "$DESKTOP_SHORTCUT"; fi
+chmod +x "$INSTALL_DIR"/*.sh 2>/dev/null
+ok "Shortcuts created."
 
-if [ -d "$HOME/Desktop" ]; then
-    cp "$DESKTOP_FILE" "$DESKTOP_SHORTCUT"
-    chmod +x "$DESKTOP_SHORTCUT"
-    success "Desktop shortcut created."
-fi
+# So the first launch does not offer an "update" to the same version
+SHA=$(curl -sf --max-time 10 "https://api.github.com/repos/$GITHUB_USER/$GITHUB_REPO/commits/$GITHUB_BRANCH" | grep -m1 '"sha"' | cut -d'"' -f4)
+echo "${SHA:-0}" > "$INSTALL_DIR/VERSION"
 
-# ── step 6: write initial version SHA ─────────────────────────────────────────
-info "Recording current version..."
-INITIAL_SHA=$(curl -sf --max-time 10 \
-    "https://api.github.com/repos/$GITHUB_USER/$GITHUB_REPO/commits/main" \
-    | grep -m1 '"sha"' | cut -d'"' -f4)
-if [ -n "$INITIAL_SHA" ]; then
-    echo "$INITIAL_SHA" > "$INSTALL_DIR/VERSION"
-    success "Version recorded."
-else
-    warn "Could not fetch version SHA — will be set on first update."
-fi
-
-# ── step 7: done ─────────────────────────────────────────────────────────────
-echo ""
-echo -e "${GREEN}${BOLD}  Download Complete! Welcome to NFSBlacklist.${CLEAR}"
-echo ""
-echo -e "  ${CYAN}Launching NFSBlacklist...${CLEAR}"
-echo ""
-
-nohup "$VENV_PYTHON" "$ENTRY_POINT" > /dev/null 2>&1 &
+echo; echo -e "  ${G}${B}Installed. Starting $APP_TITLE...${X}"; echo
+# Detached: closing this terminal must not close the app
+setsid nohup "$VENV_PYTHON" "$ENTRY_POINT" >/dev/null 2>&1 &
 disown
 exit 0

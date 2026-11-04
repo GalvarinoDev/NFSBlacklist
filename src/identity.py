@@ -1,92 +1,70 @@
 """
-identity.py - NFSBlacklist branch identity
+identity.py - project names and paths, read from ../project.env
 
-Single source of truth for everything that differs between Stable and
-Nightly builds. Every module that needs a repo URL, install path, or
-branding string imports from here instead of hardcoding it.
-
-To switch between branches, change ONLY this file:
-    BRANCH = "nightly"  ->  BRANCH = "stable"
-
-Everything else derives from that one value.
-
-Zero internal NFSBlacklist imports so it can be loaded first without
-circular-dependency risk (same pattern as log.py).
+The engine imports this module by name. Everything that differs between
+projects (or between a nightly and a stable repo of one project) comes
+from project.env, which the shell scripts read too, so there is one source.
 """
 
 import os
+import shlex
 
-# -- The one value you change per branch --------------------------------------
-
-BRANCH = "stable"  # "nightly" or "stable"
-
-# -- Everything below is derived ----------------------------------------------
-
-GITHUB_USER = "GalvarinoDev"
-
-GITHUB_REPO = "NFSBlacklist-Nightly" if BRANCH == "nightly" else "NFSBlacklist"
-
-GITHUB_RAW = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main"
-
-GITHUB_API = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}"
-
-# Local install directory name - no path, just the folder name
-INSTALL_DIR_NAME = "NFSBlacklist-Nightly" if BRANCH == "nightly" else "NFSBlacklist"
-
-# Full install path
-INSTALL_DIR = os.path.expanduser(f"~/{INSTALL_DIR_NAME}")
-
-# Config and log paths
-CONFIG_PATH = os.path.join(INSTALL_DIR, "nfsblacklist.json")
-LOG_DIR = os.path.join(INSTALL_DIR, "logs")
-LEDGER_PATH = os.path.join(INSTALL_DIR, "vdf_ledger.json")
-
-# XDG paths (save backups, shared DLLs)
-_XDG_ID = "nfsblacklist-nightly" if BRANCH == "nightly" else "nfsblacklist"
-
-# Desktop entry paths
-DESKTOP_FILE = os.path.expanduser(
-    f"~/.local/share/applications/{_XDG_ID}.desktop"
-)
-DESKTOP_SHORTCUT_NAME = f"{INSTALL_DIR_NAME}.desktop"
-
-# Venv python path
-VENV_PYTHON = os.path.join(INSTALL_DIR, ".venv", "bin", "python3")
-
-# -- UI branding --------------------------------------------------------------
-
-APP_TITLE = "NFSBlacklist Nightly" if BRANCH == "nightly" else "NFSBlacklist"
-
-# Set to None for stable - the UI badge is omitted entirely
-BUILD_BADGE = "NIGHTLY BUILD" if BRANCH == "nightly" else None
-
-BUILD_HASH_FALLBACK = "nightly" if BRANCH == "nightly" else "stable"
-
-DESKTOP_ENTRY_NAME = APP_TITLE
-DESKTOP_ENTRY_COMMENT = (
-    f"{APP_TITLE} - Experimental build"
-    if BRANCH == "nightly"
-    else f"{APP_TITLE} - Black Box NFS on SteamOS"
-)
-
-# -- GitHub raw asset URLs ----------------------------------------------------
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def asset_url(path: str) -> str:
-    """Build a raw GitHub URL for a repo asset.
+def _env(path):
+    out = {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    out[k.strip()] = " ".join(shlex.split(v)) if v.strip() else ""
+    except OSError:
+        pass
+    return out
 
-    Usage:
-        from identity import asset_url
-        url = asset_url("assets/images/icon.png")
-    """
-    return f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/refs/heads/main/{path}"
 
+_E = _env(os.path.join(PROJECT_ROOT, "project.env"))
 
-def api_url(endpoint: str) -> str:
-    """Build a GitHub API URL.
+APP_ID = _E.get("APP_ID", "myproject")
+APP_TITLE = _E.get("APP_TITLE", "My Project")
+GITHUB_USER = _E.get("GITHUB_USER", "yourname")
+GITHUB_REPO = _E.get("GITHUB_REPO", "MyProject")
+GITHUB_BRANCH = _E.get("GITHUB_BRANCH", "main")
+BUILD_BADGE = _E.get("BUILD_BADGE", "")
+PROTECTED_PATHS = tuple(_E.get("PROTECTED", "").split())
 
-    Usage:
-        from identity import api_url
-        url = api_url("commits/main")
-    """
-    return f"{GITHUB_API}/{endpoint}"
+INSTALL_DIR = PROJECT_ROOT
+CONFIG_PATH = os.path.join(PROJECT_ROOT, "config.json")
+LOG_DIR = os.path.join(PROJECT_ROOT, "logs")
+# Outside the install folder: survives updates; the uninstaller keeps save_backup/
+DATA_DIR = os.path.expanduser(f"~/.local/share/{APP_ID}")
+LEDGER_PATH = os.path.expanduser(f"~/.config/{APP_ID}/steam_edits.json")
+
+try:
+    VERSION = open(os.path.join(PROJECT_ROOT, "VERSION")).read().strip()[:7] or "dev"
+except OSError:
+    VERSION = "dev"
+
+# Tag on every non-Steam shortcut this app makes (how it finds its own)
+SHORTCUT_TAG = APP_TITLE
+
+# Brand colours for engine.ui (see engine/ui/theme.py for every token)
+# M3 GTR palette carried over from the pre-engine UI: navy, racing blue, silver
+THEME = {
+    "bg": "#0a0e17",
+    "panel": "#141c2b",
+    "panel_hi": "#1e2a3d",
+    "accent": "#3b7dd8",
+    "muted": "#7a8599",
+    "border": "#2a3a52",
+    "bad": "#7a1515",
+    "font": "Orbitron",
+}
+
+# Extra config keys this project stores (engine.config merges them into its defaults)
+CONFIG_DEFAULTS = {
+    "choices": {},
+}
